@@ -18,12 +18,12 @@ jobs:
           node-version: 20
           cache: npm
       - run: npm ci
-      # Warnings, not just errors. --severity=error catches little more than
-      # parse failures, and the class that actually matters here is the one
-      # below it: an unquoted variable in a script that runs rm -rf against a
-      # path the caller supplied. install.sh writes into other people's
-      # repositories, so it is held to that.
+      # Down to info, which is where the check that matters here lives:
+      # SC2086, an unquoted variable expansion, is info — not warning — and
+      # install.sh runs rm -rf against a path its caller supplied and writes
+      # into other people's repositories. Style is excluded deliberately;
+      # everything at info and above is a correctness signal.
       - name: shellcheck
-        run: shellcheck --severity=warning install.sh tests/install_test.sh templates/githooks/*
+        run: shellcheck --severity=info install.sh tests/install_test.sh templates/githooks/*
       - name: tests
         run: npm test
