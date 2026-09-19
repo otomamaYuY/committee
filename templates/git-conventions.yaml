@@ -24,7 +24,11 @@ branch_types:
   - hotfix
   - release
   - chore
-  - claude   # Conventional Branch AI-agent prefix for Claude Code
+  # Conventional Branch's AI-agent prefixes. Keep the branches an agent
+  # opens distinguishable from the ones a person opens — it is the cheapest
+  # signal a reviewer gets about where a change came from.
+  - claude
+  - codex
 
 comment_labels:
   - praise

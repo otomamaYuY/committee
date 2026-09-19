@@ -1,6 +1,13 @@
 {
   "name": "committee",
+  "version": "0.1.0",
   "private": true,
+  "description": "Conventional Commits, Branch, Comments and SemVer for repos where Claude Code and Codex write most of the commits",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/otomamaYuY/committee.git"
+  },
   "scripts": {
     "test": "bash tests/install_test.sh && node tests/drift_test.js"
   },

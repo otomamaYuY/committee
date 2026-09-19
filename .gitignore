@@ -1,6 +1,2 @@
 node_modules/
-.pixi/
-result
-result-*
-.direnv/
 *.bak

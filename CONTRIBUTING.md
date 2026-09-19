@@ -36,5 +36,17 @@ Both failure modes are quiet in production — a stale `templates/` copy still
 leaves CI green here while shipping the unfixed file to every adopting repo —
 so please add a case rather than only fixing the symptom.
 
-If you touch `install.sh`, also run `shellcheck --severity=error install.sh`;
+If you touch a shell file, also run
+`shellcheck --severity=error install.sh tests/install_test.sh templates/githooks/*`;
 CI does.
+
+## The duplication is deliberate
+
+Several files exist twice: once under `templates/` (what adopters receive)
+and once at the repo root (what this repo runs on itself). **Change both.**
+`npm test` fails if they drift, which is the only thing standing between a
+root-only fix and shipping the unfixed file to every adopting repo.
+
+`.claude/git-conventions.yaml` is the one exception — it is the adopter's
+customization surface, so this repo's copy is free to differ from the
+template.
