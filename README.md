@@ -18,15 +18,15 @@ hold up even when "usually" isn't good enough:
 | Layer | What it does | Mechanism |
 |---|---|---|
 | **Knowledge** | Teaches Claude Code the conventions and *why* a given type/label fits a change (semantic judgment) | A Claude Code [Skill](https://code.claude.com/docs/en/skills) that loads on demand, not every session |
-| **Enforcement** | Rejects malformed branch names/commit messages no matter what Claude (or a human) decides; computes the version number automatically | `commitlint`, `commit-check`, `semantic-release`, git hooks, GitHub Actions |
+| **Enforcement** | Rejects malformed branch names/commit messages no matter what Claude (or a human) decides | `commitlint`, `commit-check`, git hooks, GitHub Actions |
 
 Neither layer alone is enough:
 
 - The enforcement layer only checks **shape** (does the string match an
   allowed pattern?). It cannot tell that a bug fix was mislabeled `feat:` —
-  that still passes every regex, and since `semantic-release` trusts the type
-  literally, a mislabeled commit ships the wrong version number, which is
-  **irreversible once released** (see
+  that still passes every regex. The type is what a reader, a changelog
+  generator or a release tool uses to decide the next version, so a
+  mislabeled commit misstates the change to everyone downstream (see
   [semver.org rule 3](https://semver.org/#spec-item-3)).
 - **Conventional Comments has no standard linter at all.** The Skill is the
   only safeguard for review-comment formatting.
@@ -39,13 +39,12 @@ templates/
 ├── git-conventions.yaml          # single source of truth: allowed types/labels + toolchain choice
 ├── commitlint.config.js          # reads git-conventions.yaml directly
 ├── .commit-check.yml             # branch-name + commit-message regex (manually synced — see comment)
-├── .releaserc.json               # semantic-release config
 ├── Makefile                      # one entry point across npm/pnpm/yarn/pixi/nix
 ├── package.json.example
 ├── pixi.toml.example
 ├── flake.nix.example / .envrc.example
 ├── husky/commit-msg
-└── github-workflows/{commit-check,release}.yml
+└── github-workflows/commit-check.yml
 install.sh                        # copies the above into a target repo
 ```
 
@@ -73,7 +72,7 @@ The target must already exist and be a git repository — the commit hook and
 the workflows do nothing outside one.
 
 **Existing files are never overwritten.** Installing into a repo that already
-has its own `Makefile`, `package.json` or `.github/workflows/release.yml`
+has its own `Makefile`, `package.json` or `.github/workflows/commit-check.yml`
 leaves those untouched and lists them under `Skipped` at the end, so you can
 merge what you need by hand. Pass `--force` to overwrite them instead, once
 you have checked you don't need their current contents. The Skill itself is

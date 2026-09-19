@@ -149,7 +149,6 @@ fi
 
 install_file "$SRC_DIR/templates/commitlint.config.js" "$TARGET_DIR/commitlint.config.js" || true
 install_file "$SRC_DIR/templates/.commit-check.yml"    "$TARGET_DIR/.commit-check.yml"    || true
-install_file "$SRC_DIR/templates/.releaserc.json"      "$TARGET_DIR/.releaserc.json"      || true
 
 if install_file "$SRC_DIR/templates/Makefile" "$TARGET_DIR/Makefile"; then
   # Bake the chosen toolchain into the Makefile's default. The git hook invokes
@@ -170,7 +169,6 @@ fi
 # --- CI ---------------------------------------------------------------------
 mkdir -p "$TARGET_DIR/.github/workflows"
 install_file "$SRC_DIR/templates/github-workflows/commit-check.yml" "$TARGET_DIR/.github/workflows/commit-check.yml" || true
-install_file "$SRC_DIR/templates/github-workflows/release.yml"      "$TARGET_DIR/.github/workflows/release.yml"      || true
 
 # --- Toolchain-specific environment ----------------------------------------
 case "$TOOLCHAIN" in

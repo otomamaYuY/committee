@@ -26,7 +26,7 @@ else ifeq ($(TOOLCHAIN),nix)
   DEPS := nix develop --command npm install
 endif
 
-.PHONY: deps commit-lint check-branch release
+.PHONY: deps commit-lint check-branch
 
 deps:
 	$(DEPS)
@@ -49,6 +49,3 @@ check-branch:
 	  echo "              install it yourself, e.g.  pipx install commit-check" >&2; \
 	  exit 1; }
 	$(PY_RUN) commit-check --branch
-
-release:
-	$(JS_RUN) semantic-release

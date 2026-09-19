@@ -13,8 +13,6 @@ This repo dogfoods its own conventions:
    (e.g. `docs: clarify pixi install steps`).
 3. Run `npm test` before opening the PR.
 4. Open a PR — `commit-check` and `test` run automatically on it.
-5. Merges to `main` trigger `semantic-release`; you don't need to bump any
-   version number yourself.
 
 ## Tests
 

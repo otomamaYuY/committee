@@ -19,8 +19,9 @@ comment — do not assume a fixed list.
   `<type>[optional scope]: <description>`. Breaking change: `!` after
   type/scope, or a `BREAKING CHANGE:` footer.
 - **Version** — [SemVer](https://semver.org): MAJOR.MINOR.PATCH.
-  feat→MINOR, fix→PATCH, BREAKING CHANGE→MAJOR. Automated by
-  semantic-release from commit types — never hand-edit a version number.
+  feat→MINOR, fix→PATCH, BREAKING CHANGE→MAJOR. The commit type is what
+  decides the next version, so pick it for what the change does, not for
+  what is convenient.
 - **Review comment** — [Conventional Comments](https://conventionalcomments.org):
   `<label> [decorations]: <subject>`.
   **No linter checks this one — this skill is the only safeguard.** Pick the
@@ -31,8 +32,8 @@ comment — do not assume a fixed list.
 
 The enforcement layer (commitlint / commit-check) only validates that the
 `type` string is on the allowed list — it cannot tell whether `feat` was the
-*correct* choice for a given diff. semantic-release trusts the type
-literally when computing the next version, so a mislabeled commit ships the
-wrong version number, which cannot be undone once released. Think about
-what the change actually does before picking a type/label, not just which
-string is permitted.
+*correct* choice for a given diff. The type is what a reader, a changelog
+and any release tooling use to decide what changed and what the next
+version should be, so a mislabeled commit misstates the change to everyone
+downstream. Think about what the change actually does before picking a
+type/label, not just which string is permitted.

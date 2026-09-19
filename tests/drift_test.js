@@ -41,10 +41,8 @@ const PAIRS = [
   ['Makefile',                             'templates/Makefile'],
   ['commitlint.config.js',                 'templates/commitlint.config.js'],
   ['.commit-check.yml',                    'templates/.commit-check.yml'],
-  ['.releaserc.json',                      'templates/.releaserc.json'],
   ['.husky/commit-msg',                    'templates/husky/commit-msg'],
   ['.github/workflows/commit-check.yml',   'templates/github-workflows/commit-check.yml'],
-  ['.github/workflows/release.yml',        'templates/github-workflows/release.yml'],
   ['.claude/skills/git-conventions/SKILL.md', 'skills/git-conventions/SKILL.md'],
 ];
 
