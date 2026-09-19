@@ -18,7 +18,7 @@ hold up even when "usually" isn't good enough:
 | Layer | What it does | Mechanism |
 |---|---|---|
 | **Knowledge** | Teaches Claude Code the conventions and *why* a given type/label fits a change (semantic judgment) | A Claude Code [Skill](https://code.claude.com/docs/en/skills) that loads on demand, not every session |
-| **Enforcement** | Rejects malformed branch names/commit messages no matter what Claude (or a human) decides | `commitlint`, `commit-check`, git hooks, GitHub Actions |
+| **Enforcement** | Rejects malformed branch names/commit messages no matter what Claude (or a human) decides | `commitlint`, two git hooks, one GitHub Actions workflow |
 
 Neither layer alone is enough:
 
@@ -37,11 +37,11 @@ Neither layer alone is enough:
 skills/git-conventions/SKILL.md   # knowledge layer (Agent Skill)
 templates/
 ├── git-conventions.yaml          # single source of truth: allowed types/labels
-├── commitlint.config.js          # reads git-conventions.yaml directly
-├── .commit-check.yml             # branch-name + commit-message regex (manually synced — see comment)
+├── commitlint.config.js          # reads git-conventions.yaml
+├── githooks/commit-msg           # Conventional Commits, on every commit
+├── githooks/pre-push             # Conventional Branch, on every push
 ├── package.json.example
-├── githooks/commit-msg
-└── github-workflows/commit-check.yml
+└── github-workflows/conventions.yml
 install.sh                        # copies the above into a target repo
 ```
 
@@ -78,11 +78,12 @@ updates without touching your configuration.
 
 ## Configuring conventions
 
-Edit `.claude/git-conventions.yaml` after install — the type/branch/label
-lists there drive both the Skill and `commitlint.config.js`. `.commit-check.yml`
-can't import YAML, so it's kept in manual sync (called out in a comment in
-that file); low-churn in practice since most projects stick to the default
-`@commitlint/config-conventional` type set.
+Edit `.claude/git-conventions.yaml` after install. Every part of the kit
+reads it and none of them restate it: the Skill quotes it to Claude,
+`commitlint.config.js` loads `commit_types` into commitlint's `type-enum`,
+and `.githooks/pre-push` parses `branch_types` out of it. Add a type there
+and it is allowed everywhere at once — locally and in CI, with no second
+list to remember.
 
 ## This repo dogfoods itself
 

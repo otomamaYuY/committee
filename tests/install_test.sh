@@ -80,11 +80,13 @@ for f in .claude/git-conventions.yaml \
          .claude/skills/git-conventions/SKILL.md \
          commitlint.config.js \
          .githooks/commit-msg \
-         .github/workflows/commit-check.yml \
+         .githooks/pre-push \
+         .github/workflows/conventions.yml \
          package.json; do
   ok "installs $f" test -f "$FRESH/$f"
 done
 ok "the commit-msg hook is executable" test -x "$FRESH/.githooks/commit-msg"
+ok "the pre-push hook is executable"   test -x "$FRESH/.githooks/pre-push"
 ok "core.hooksPath points at the tracked hooks" \
    sh -c '[ "$(git -C "$1" config --local --get core.hooksPath)" = ".githooks" ]' _ "$FRESH"
 ok "package.json declares commitlint"  grep -q '@commitlint/cli' "$FRESH/package.json"
@@ -98,13 +100,13 @@ echo "== no-clobber"
 
 REPO="$(new_repo clobber)"
 mkdir -p "$REPO/.github/workflows"
-printf 'name: my real workflow\n' > "$REPO/.github/workflows/commit-check.yml"
+printf 'name: my real workflow\n' > "$REPO/.github/workflows/conventions.yml"
 printf 'module.exports = { mine: true };\n' > "$REPO/commitlint.config.js"
 printf '{"name":"mine"}\n' > "$REPO/package.json"
 
 OUT="$("$INSTALL" "$REPO" 2>&1)"
 
-ok "pre-existing workflow survives"    grep -qx 'name: my real workflow' "$REPO/.github/workflows/commit-check.yml"
+ok "pre-existing workflow survives"    grep -qx 'name: my real workflow' "$REPO/.github/workflows/conventions.yml"
 ok "pre-existing config survives"      grep -q  'mine: true'             "$REPO/commitlint.config.js"
 ok "pre-existing package.json survives" grep -q '"name":"mine"'          "$REPO/package.json"
 ok "files absent from the target are still installed" test -f "$REPO/.githooks/commit-msg"
@@ -178,6 +180,55 @@ if git -C "$E2E" commit -q -m "wip: now allowed by the yaml"; then
 else
   fail "adding a type to git-conventions.yaml changes what the hook accepts"
 fi
+
+echo "== branch names are judged against git-conventions.yaml"
+
+BR="$(new_repo branch)"
+"$INSTALL" "$BR" >/dev/null 2>&1
+
+# COMMITTEE_BRANCH is how CI passes the branch under test, since a PR build
+# checks out a detached merge ref with no branch name of its own.
+check_branch() { (cd "$BR" && COMMITTEE_BRANCH="$1" ./.githooks/pre-push >/dev/null 2>&1); }
+
+for good in main master develop feature/add-oauth-login claude/scaffold-the-kit fix/off-by-one chore/bump-deps; do
+  ok "accepts '$good'" check_branch "$good"
+done
+
+for bad in Feature/Capitalized feature/Has-Capitals feature/trailing- feature/double--hyphen \
+           nosuchtype/thing no-slash-at-all feature/ "feature/x y"; do
+  no "rejects '$bad'" check_branch "$bad"
+done
+
+BR_OUT="$(cd "$BR" && COMMITTEE_BRANCH=nosuchtype/thing ./.githooks/pre-push 2>&1 || true)"
+has "the rejection explains the expected shape" "$BR_OUT" "<type>/<description>"
+has "the rejection lists the allowed types"     "$BR_OUT" "feature"
+has "the rejection says how to fix it"          "$BR_OUT" "git branch -m"
+
+# Source of truth, again: the hook must follow the yaml, not a baked-in list.
+sed -i.bak 's|^branch_types:$|branch_types:\n  - spike|' "$BR/.claude/git-conventions.yaml"
+rm -f "$BR/.claude/git-conventions.yaml.bak"
+ok "a type added to the yaml becomes acceptable" check_branch "spike/try-something"
+
+# A detached HEAD has no branch to judge; the hook must not block the push.
+ok "a detached HEAD is not blocked" \
+   sh -c 'cd "$1" && COMMITTEE_BRANCH= ./.githooks/pre-push' _ "$BR"
+
+echo "== end to end: a real push through the installed hook"
+
+REMOTE="$TMP_ROOT/remote.git"
+git init -q --bare "$REMOTE"
+PUSH="$(new_repo push)"
+"$INSTALL" "$PUSH" >/dev/null 2>&1
+ln -s "$KIT_DIR/node_modules" "$PUSH/node_modules"
+git -C "$PUSH" remote add origin "$REMOTE"
+echo hello > "$PUSH/file.txt"
+git -C "$PUSH" add -A
+git -C "$PUSH" commit -q -m "feat: add a file"
+
+git -C "$PUSH" checkout -q -b Not_Conventional
+no "a malformed branch name is rejected on push" git -C "$PUSH" push -q origin Not_Conventional
+git -C "$PUSH" checkout -q -b feature/properly-named
+ok "a conventional branch name pushes"           git -C "$PUSH" push -q origin feature/properly-named
 
 echo
 echo "install_test: $PASSED passed, $FAILED failed"

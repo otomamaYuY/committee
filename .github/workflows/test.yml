@@ -1,5 +1,5 @@
 # This workflow tests the kit itself and is deliberately NOT mirrored under
-# templates/ — adopting repos receive commit-check.yml and release.yml only.
+# templates/ — adopting repos receive conventions.yml only.
 # tests/drift_test.js knows about that asymmetry.
 name: test
 on:
@@ -22,6 +22,6 @@ jobs:
       # repositories, so a genuine bug must fail the build, while style nits
       # should not block a PR.
       - name: shellcheck
-        run: shellcheck --severity=error install.sh tests/install_test.sh
+        run: shellcheck --severity=error install.sh tests/install_test.sh templates/githooks/*
       - name: tests
         run: npm test

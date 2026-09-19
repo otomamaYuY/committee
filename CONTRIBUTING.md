@@ -2,7 +2,8 @@
 
 This repo dogfoods its own conventions:
 
-- **Branches**: `feature/…`, `fix/…`, etc. — see [Conventional Branch](https://conventionalbranch.org)
+- **Branches**: `feature/…`, `fix/…`, etc. — see [Conventional Branch](https://conventionalbranch.org).
+  The `pre-push` hook checks this before anything leaves your machine.
 - **Commits**: Conventional Commits — allowed types are in `.claude/git-conventions.yaml`
 - **PR review comments**: Conventional Comments (`label: subject`)
 
@@ -12,7 +13,7 @@ This repo dogfoods its own conventions:
 2. Make your change with a matching commit message
    (e.g. `docs: clarify the install steps`).
 3. Run `npm test` before opening the PR.
-4. Open a PR — `commit-check` and `test` run automatically on it.
+4. Open a PR — `conventions` and `test` run automatically on it.
 
 ## Tests
 
@@ -24,10 +25,12 @@ This repo dogfoods its own conventions:
   without hijacking a repo that already routes hooks elsewhere, and — end to
   end, with real `git commit` calls — the type list in `git-conventions.yaml`
   is what the installed hook actually enforces.
-- `tests/drift_test.js` — catches the two duplications that rot silently: the
-  root files this repo dogfoods against their `templates/` counterparts, and
-  the type/branch lists in `.claude/git-conventions.yaml` against the regexes
-  in `.commit-check.yml`, which cannot import YAML.
+- `tests/drift_test.js` — catches what rots without raising an error: the
+  root files this repo dogfoods against their `templates/` counterparts, the
+  claim that `.claude/git-conventions.yaml` is the single source of truth
+  (it loads `commitlint.config.js` and checks the list commitlint will
+  actually enforce), and the workflows' pinning, permissions and freedom
+  from `${{ }}` interpolation inside `run:`.
 
 Both failure modes are quiet in production — a stale `templates/` copy still
 leaves CI green here while shipping the unfixed file to every adopting repo —

@@ -1,6 +1,7 @@
 # Single source of truth for this repo's git conventions.
-# Consumed by: .claude/skills/git-conventions/SKILL.md, commitlint.config.js,
-# and (manually kept in sync — see comment there) .commit-check.yml.
+# Consumed by: .claude/skills/git-conventions/SKILL.md (knowledge),
+# commitlint.config.js (commit messages) and .githooks/pre-push (branch
+# names). All three read this file; none of them restate its contents.
 
 commit_types:
   - feat

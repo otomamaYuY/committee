@@ -5,10 +5,10 @@ description: Use whenever creating a git branch, writing a commit message, taggi
 
 # Git Conventions
 
-Allowed types/scopes/prefixes/labels are defined in `.claude/git-conventions.yaml`
-(the single source of truth, also consumed by commitlint and commit-check).
-Read that file before constructing a branch name, commit message, or review
-comment — do not assume a fixed list.
+Allowed types/prefixes/labels are defined in `.claude/git-conventions.yaml`
+— the single source of truth, also read by `commitlint.config.js` and the
+`pre-push` hook. Read that file before constructing a branch name, commit
+message, or review comment; do not assume a fixed list.
 
 ## Shape (from the specs themselves — rarely changes)
 
@@ -30,7 +30,7 @@ comment — do not assume a fixed list.
 
 ## Why this matters beyond formatting
 
-The enforcement layer (commitlint / commit-check) only validates that the
+The enforcement layer (commitlint and the git hooks) only validates that the
 `type` string is on the allowed list — it cannot tell whether `feat` was the
 *correct* choice for a given diff. The type is what a reader, a changelog
 and any release tooling use to decide what changed and what the next

@@ -1,20 +1,19 @@
 #!/usr/bin/env node
-// Drift tests for the kit's duplicated sources of truth.
-//
-// Two kinds of duplication exist here by design, and both can rot silently:
+// Drift tests for the things that rot without producing a runtime error.
 //
 //   1. The repo dogfoods its own kit, so several files exist twice — once at
 //      the root (the copy a contributor can actually run) and once under
 //      templates/ (the copy every adopting repo receives). Fixing only the
-//      root leaves CI green while shipping the unfixed version to everyone.
+//      root leaves CI green here while shipping the unfixed file to everyone.
 //
-//   2. commitlint reads the type list from .claude/git-conventions.yaml at
-//      runtime, but commit-check cannot import YAML, so .commit-check.yml
-//      restates the same lists as regex alternations. When they disagree, a
-//      commit passes the local hook and fails in CI with no local repro.
+//   2. git-conventions.yaml is supposed to be the single source of truth. If
+//      commitlint.config.js or the pre-push hook ever stopped deriving their
+//      lists from it, both would still work — they would just quietly
+//      disagree about what is allowed.
 //
-// Neither has a runtime failure mode that points at the duplication, which is
-// what makes a test worth more here than a comment.
+//   3. A workflow pinned to a mutable tag, with no permissions block, or
+//      interpolating an event value into a shell command is a supply-chain
+//      hole that no passing test run will ever surface.
 
 const fs = require('fs');
 const path = require('path');
@@ -37,11 +36,13 @@ function read(rel) { return fs.readFileSync(path.join(ROOT, rel), 'utf8'); }
 // --- 1. root <-> templates/ must stay byte-identical -------------------------
 // .claude/git-conventions.yaml is deliberately absent: it is the adopter's
 // customization surface, so this repo is free to diverge from the template.
+// .github/workflows/test.yml is absent too — it tests the kit itself and is
+// not shipped to adopters.
 const PAIRS = [
-  ['commitlint.config.js',                 'templates/commitlint.config.js'],
-  ['.commit-check.yml',                    'templates/.commit-check.yml'],
-  ['.githooks/commit-msg',                  'templates/githooks/commit-msg'],
-  ['.github/workflows/commit-check.yml',   'templates/github-workflows/commit-check.yml'],
+  ['commitlint.config.js',                    'templates/commitlint.config.js'],
+  ['.githooks/commit-msg',                    'templates/githooks/commit-msg'],
+  ['.githooks/pre-push',                      'templates/githooks/pre-push'],
+  ['.github/workflows/conventions.yml',       'templates/github-workflows/conventions.yml'],
   ['.claude/skills/git-conventions/SKILL.md', 'skills/git-conventions/SKILL.md'],
 ];
 
@@ -56,110 +57,83 @@ for (const [rootFile, templateFile] of PAIRS) {
   }
 }
 
-// --- 2. git-conventions.yaml <-> .commit-check.yml regexes -------------------
-console.log('== commit-check regexes match git-conventions.yaml');
+// --- 2. git-conventions.yaml really is the single source of truth ------------
+console.log('== the conventions file drives the tools that enforce it');
 
 const conventions = yaml.load(read('.claude/git-conventions.yaml'));
 
-// Pull the lowercase alternations out of a regex: `(feat|fix|docs)` matches,
-// while `(\(.+\))?` and the branch regex's mixed outer group do not.
-function alternations(regex) {
-  return [...regex.matchAll(/\(([a-z|]+)\)/g)].map(m => m[1].split('|'));
-}
-
-function sameSet(a, b) {
-  return a.length === b.length && a.every((v, i) => v === b[i]);
-}
-
-for (const file of ['.commit-check.yml', 'templates/.commit-check.yml']) {
-  const checks = yaml.load(read(file)).checks;
-
-  const messageCheck = checks.find(c => c.check === 'message');
-  const branchCheck = checks.find(c => c.check === 'branch');
-
-  if (!messageCheck || !branchCheck) {
-    no(`${file} defines a message and a branch check`);
-    continue;
-  }
-
-  const messageGroups = alternations(messageCheck.regex);
-  const branchGroups = alternations(branchCheck.regex);
-
-  if (messageGroups.length !== 1) {
-    no(`${file} message regex has exactly one type alternation`,
-       `found ${messageGroups.length}`);
-  } else if (sameSet(messageGroups[0], conventions.commit_types)) {
-    ok(`${file} message regex lists the same commit_types`);
+for (const key of ['commit_types', 'branch_types', 'comment_labels']) {
+  if (Array.isArray(conventions[key]) && conventions[key].length > 0) {
+    ok(`git-conventions.yaml defines ${key}`);
   } else {
-    no(`${file} message regex lists the same commit_types`,
-       `yaml: ${conventions.commit_types.join('|')}\n       regex: ${messageGroups[0].join('|')}`);
-  }
-
-  if (branchGroups.length !== 1) {
-    no(`${file} branch regex has exactly one prefix alternation`,
-       `found ${branchGroups.length}`);
-  } else if (sameSet(branchGroups[0], conventions.branch_types)) {
-    ok(`${file} branch regex lists the same branch_types`);
-  } else {
-    no(`${file} branch regex lists the same branch_types`,
-       `yaml: ${conventions.branch_types.join('|')}\n       regex: ${branchGroups[0].join('|')}`);
+    no(`git-conventions.yaml defines ${key}`, `got ${JSON.stringify(conventions[key])}`);
   }
 }
 
-// --- 3. the regexes accept and reject what the conventions describe ----------
-console.log('== the branch regex behaves as the conventions describe');
+// Load the real config the way commitlint does, rather than reading it as
+// text: this fails if the file stops deriving its list from the yaml, even
+// though both files would still be individually valid.
+const commitlintConfig = require(path.join(ROOT, 'commitlint.config.js'));
+const typeEnum = commitlintConfig.rules && commitlintConfig.rules['type-enum']
+  ? commitlintConfig.rules['type-enum'][2]
+  : undefined;
 
-const branchRegex = new RegExp(
-  yaml.load(read('.commit-check.yml')).checks.find(c => c.check === 'branch').regex
+if (!Array.isArray(typeEnum)) {
+  no('commitlint.config.js exposes a type-enum rule', `got ${JSON.stringify(typeEnum)}`);
+} else if (JSON.stringify(typeEnum) === JSON.stringify(conventions.commit_types)) {
+  ok('commitlint enforces exactly the yaml commit_types');
+} else {
+  no('commitlint enforces exactly the yaml commit_types',
+     `yaml:       ${conventions.commit_types.join(', ')}\n       commitlint: ${typeEnum.join(', ')}`);
+}
+
+// The pre-push hook must read the yaml rather than restate it — the manual
+// sync this replaced was a standing source of local/CI disagreement.
+const prePush = read('.githooks/pre-push');
+if (prePush.includes('git-conventions.yaml')) ok('pre-push reads the conventions file');
+else no('pre-push reads the conventions file', 'it appears to hardcode its own list');
+
+const hardcoded = conventions.branch_types.filter(
+  t => new RegExp(`[|'"(]${t}[|'")]`).test(prePush)
 );
+if (hardcoded.length === 0) ok('pre-push hardcodes no branch types');
+else no('pre-push hardcodes no branch types',
+        `found ${hardcoded.join(', ')} — the list belongs in git-conventions.yaml only`);
 
-const branchCases = [
-  ['main', true], ['develop', true],
-  ['feature/add-pnpm-example', true],
-  ['claude/scaffold-kit', true],
-  ['Feature/Capitalized', false],
-  ['feature/Trailing-', false],
-  ['nosuchtype/thing', false],
-];
-
-for (const [name, expected] of branchCases) {
-  const got = branchRegex.test(name);
-  if (got === expected) ok(`branch "${name}" is ${expected ? 'accepted' : 'rejected'}`);
-  else no(`branch "${name}" should be ${expected ? 'accepted' : 'rejected'}`);
-}
-
-// --- 4. third-party actions must be pinned to a commit ----------------------
-// A tag is mutable: `@v1` resolves at run time to whatever that repository's
-// maintainer — or whoever compromises it — has v1 pointing at. Actions under
-// actions/ are GitHub's own and are left on their major tag deliberately.
-console.log('== third-party actions are pinned to a commit SHA');
+// --- 3. workflows are pinned, scoped, and injection-free ---------------------
+console.log('== workflows are pinned and scoped');
 
 const WORKFLOW_DIRS = ['.github/workflows', 'templates/github-workflows'];
 
 for (const dir of WORKFLOW_DIRS) {
   for (const name of fs.readdirSync(path.join(ROOT, dir)).sort()) {
-    const text = read(path.join(dir, name));
+    const rel = path.join(dir, name);
+    const text = read(rel);
+
+    // A tag is mutable: `@v1` resolves at run time to whatever that
+    // repository's maintainer — or whoever compromises it — has v1 pointing
+    // at. Actions under actions/ are GitHub's own and stay on a major tag.
     for (const m of text.matchAll(/uses:\s*(\S+)/g)) {
       const ref = m[1];
       if (ref.startsWith('actions/')) continue;
-      const desc = `${dir}/${name}: ${ref.split('@')[0]}`;
+      const desc = `${rel}: ${ref.split('@')[0]}`;
       if (/@[0-9a-f]{40}$/.test(ref)) ok(`${desc} is SHA-pinned`);
       else no(`${desc} is SHA-pinned`, `pinned to "${ref.split('@')[1]}" — a mutable tag`);
     }
-  }
-}
 
-// --- 5. workflows declare their token scope ---------------------------------
-console.log('== workflows declare permissions explicitly');
-
-for (const dir of WORKFLOW_DIRS) {
-  for (const name of fs.readdirSync(path.join(ROOT, dir)).sort()) {
-    const wf = yaml.load(read(path.join(dir, name)));
+    const wf = yaml.load(text);
     const declared = wf.permissions !== undefined
       || Object.values(wf.jobs || {}).every(j => j.permissions !== undefined);
-    if (declared) ok(`${dir}/${name} declares permissions`);
-    else no(`${dir}/${name} declares permissions`,
+    if (declared) ok(`${rel} declares permissions`);
+    else no(`${rel} declares permissions`,
             'without it the job inherits the repository default, which may be read-write');
+
+    // A `${{ }}` expression interpolated straight into a run: body is how a
+    // workflow becomes a script-injection sink. Values belong in env:.
+    const injected = [...text.matchAll(/^[ \t-]*run:.*\$\{\{/gm)];
+    if (injected.length === 0) ok(`${rel} keeps event values out of run: bodies`);
+    else no(`${rel} keeps event values out of run: bodies`,
+            `${injected.length} run: line(s) interpolate an expression directly`);
   }
 }
 

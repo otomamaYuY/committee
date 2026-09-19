@@ -119,9 +119,11 @@ install_file "$SRC_DIR/templates/commitlint.config.js" "$TARGET_DIR/commitlint.c
 
 # --- Git hooks --------------------------------------------------------------
 mkdir -p "$TARGET_DIR/.githooks"
-if install_file "$SRC_DIR/templates/githooks/commit-msg" "$TARGET_DIR/.githooks/commit-msg"; then
-  chmod +x "$TARGET_DIR/.githooks/commit-msg"
-fi
+for _hook in commit-msg pre-push; do
+  if install_file "$SRC_DIR/templates/githooks/$_hook" "$TARGET_DIR/.githooks/$_hook"; then
+    chmod +x "$TARGET_DIR/.githooks/$_hook"
+  fi
+done
 
 # Point git at the hooks. Tracked hooks plus core.hooksPath is all that is
 # needed here — no hook-manager dependency, and no manual init step that a
@@ -140,7 +142,7 @@ fi
 
 # --- CI ---------------------------------------------------------------------
 mkdir -p "$TARGET_DIR/.github/workflows"
-install_file "$SRC_DIR/templates/github-workflows/commit-check.yml" "$TARGET_DIR/.github/workflows/commit-check.yml" || true
+install_file "$SRC_DIR/templates/github-workflows/conventions.yml" "$TARGET_DIR/.github/workflows/conventions.yml" || true
 
 # --- Dev dependencies -------------------------------------------------------
 # commitlint is a Node program and commitlint.config.js requires js-yaml to
