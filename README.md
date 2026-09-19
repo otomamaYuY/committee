@@ -69,6 +69,17 @@ files into your repo root, and sets `toolchain:` in
 `.claude/git-conventions.yaml`. The script prints next steps (installing
 dependencies, enabling the git hook) when it finishes.
 
+The target must already exist and be a git repository — the commit hook and
+the workflows do nothing outside one.
+
+**Existing files are never overwritten.** Installing into a repo that already
+has its own `Makefile`, `package.json` or `.github/workflows/release.yml`
+leaves those untouched and lists them under `Skipped` at the end, so you can
+merge what you need by hand. Pass `--force` to overwrite them instead, once
+you have checked you don't need their current contents. The Skill itself is
+kit-owned and always refreshed, so re-running the installer picks up Skill
+updates without touching your configuration.
+
 ## Configuring conventions
 
 Edit `.claude/git-conventions.yaml` after install — the type/branch/label
