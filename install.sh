@@ -198,14 +198,24 @@ fi
 if [ "$MISSING_DEPS" = "yes" ]; then
   cat << 'WARN'
 
-Warning: this repo already has a package.json, so the kit's dev dependencies
-  were NOT added. The commit hook needs both of these:
+Warning: this repo already has a package.json, so two things were NOT added.
 
-      @commitlint/cli  @commitlint/config-conventional  js-yaml
+  1. The dev dependencies the hooks need:
 
-  Add them yourself before committing, or every commit will be rejected with a
-  module-resolution error that names none of this. See package.json.example in
-  the kit for the versions it expects.
+         @commitlint/cli  @commitlint/config-conventional  js-yaml
+
+     Without them every commit is rejected with a module-resolution error
+     that names none of this, and the PR workflow fails the same way.
+
+  2. A prepare script, which is what wires the hooks up for everyone else:
+
+         "scripts": { "prepare": "git config --local core.hooksPath .githooks" }
+
+     core.hooksPath lives in .git/config and is never committed, so without
+     this every teammate and every fresh clone has the hook FILES but no
+     hooks running. Add it, or each of them must run that command by hand.
+
+  See package.json.example in the kit for both.
 WARN
 fi
 
@@ -216,5 +226,10 @@ Next steps:
   2. Install the dev dependencies:
        npm install      (or: pnpm install / yarn install)
   3. Commit the new files.
+
+Hooks are active here now. For everyone else they are activated by the
+prepare script in package.json, which runs on their first `npm install` —
+core.hooksPath lives in .git/config and is never committed, so a fresh
+clone has the hook files but nothing running them until then.
 
 MSG

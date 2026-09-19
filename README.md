@@ -69,9 +69,18 @@ git clone https://github.com/otomamaYuY/committee.git /tmp/committee
 cd /path/to/your/repo && npm install    # or pnpm install / yarn install
 ```
 
-That is the entire setup. `install.sh` also points `core.hooksPath` at the
-tracked `.githooks/` directory, so the hooks are live immediately — there is
-no separate init step to forget and no hook manager to depend on.
+That is the entire setup. `install.sh` points `core.hooksPath` at the
+tracked `.githooks/` directory, so the hooks are live on your machine right
+away.
+
+**For everyone else, `npm install` is what activates them.** `core.hooksPath`
+lives in `.git/config`, which is never committed, so a teammate's fresh clone
+has the hook *files* but nothing running them. The `prepare` script in
+`package.json` — `git config --local core.hooksPath .githooks` — runs on
+their first install and wires it up. It is husky's one-line idiom without
+the dependency. If your repo already had a `package.json`, the installer
+tells you to add that script yourself; skip it and the hooks silently run
+for exactly one person on the team.
 
 The target must already exist and be a git repository; the hooks and the
 workflow do nothing outside one.

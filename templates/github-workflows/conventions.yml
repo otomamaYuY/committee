@@ -13,7 +13,20 @@ jobs:
         with: { node-version: 20 }
       # `npm install` rather than `npm ci`: it uses the lockfile when there is
       # one and still works in a repo that has not committed one yet.
-      - run: npm install --no-audit --no-fund
+      # --ignore-scripts because this job only needs commitlint to run, and a
+      # pull_request build installs dependencies a pull request can change.
+      - run: npm install --no-audit --no-fund --ignore-scripts
+
+      # Without this, a repo that never added the dev dependencies fails the
+      # next step with a module-resolution error naming neither the packages
+      # nor this kit — the most likely way for an adopter to land here, since
+      # install.sh cannot add dependencies to an existing package.json.
+      - name: preflight
+        run: |
+          if ! npx --no -- commitlint --version >/dev/null 2>&1; then
+            echo "::error::commitlint is not installed. Add @commitlint/cli, @commitlint/config-conventional and js-yaml to devDependencies (see package.json.example in the committee kit)."
+            exit 1
+          fi
 
       # Values from the event go through the environment, never string
       # interpolation into the shell — the habit that keeps a workflow from

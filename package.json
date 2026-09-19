@@ -9,6 +9,7 @@
     "url": "https://github.com/otomamaYuY/committee.git"
   },
   "scripts": {
+    "prepare": "git config --local core.hooksPath .githooks",
     "test": "bash tests/install_test.sh && node tests/drift_test.js"
   },
   "devDependencies": {

@@ -275,6 +275,46 @@ cp "$CFG/healthy.yaml" "$CFG/.claude/git-conventions.yaml"
 ok "a healthy config still accepts a good message" \
    sh -c 'cd "$1" && ./.githooks/commit-msg msg' _ "$CFG"
 
+echo "== the hooks reach a teammate's clone, not just the installer's machine"
+
+# core.hooksPath lives in .git/config and is never committed. Without the
+# prepare script the hook FILES arrive in every clone and nothing runs them,
+# so the kit would enforce its conventions for exactly one person.
+ok "package.json.example ships a prepare script" \
+   grep -q 'core.hooksPath .githooks' "$KIT_DIR/templates/package.json.example"
+
+LEAD="$(new_repo lead)"
+"$INSTALL" "$LEAD" >/dev/null 2>&1
+git -C "$LEAD" add -A
+git -C "$LEAD" -c core.hooksPath=/dev/null commit -q -m "chore: adopt the kit"
+
+MATE="$TMP_ROOT/teammate"
+rm -rf "$MATE"
+git clone -q "$LEAD" "$MATE"
+git -C "$MATE" config user.email m@example.invalid
+git -C "$MATE" config user.name mate
+
+ok "a fresh clone receives the hook files" test -x "$MATE/.githooks/commit-msg"
+if [ -z "$(git -C "$MATE" config --local --get core.hooksPath)" ]; then
+  pass "a fresh clone starts with no hooksPath (this is why prepare exists)"
+else
+  fail "a fresh clone unexpectedly already had hooksPath set"
+fi
+
+# Run exactly what `npm install` would run as prepare.
+PREPARE="$(node -e 'const fs=require("fs");process.stdout.write(JSON.parse(fs.readFileSync(process.argv[1],"utf8")).scripts.prepare)' "$KIT_DIR/templates/package.json.example")"
+(cd "$MATE" && sh -c "$PREPARE")
+ok "the prepare script wires the clone up" \
+   sh -c '[ "$(git -C "$1" config --local --get core.hooksPath)" = ".githooks" ]' _ "$MATE"
+
+ln -s "$KIT_DIR/node_modules" "$MATE/node_modules"
+echo x > "$MATE/f.txt"
+git -C "$MATE" add -A
+no "the teammate's bad commit is now rejected" \
+   git -C "$MATE" commit -q -m "totally unconventional"
+ok "and a good one is accepted" \
+   git -C "$MATE" commit -q -m "feat: something conventional"
+
 echo
 echo "install_test: $PASSED passed, $FAILED failed"
 [ "$FAILED" -eq 0 ]
