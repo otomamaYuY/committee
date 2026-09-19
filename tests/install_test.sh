@@ -205,8 +205,13 @@ for good in main master develop feature/add-oauth-login claude/scaffold-the-kit 
   ok "accepts '$good'" check_branch "$good"
 done
 
+# docs/ and perf/ are commit_types, note/ and question/ are comment_labels.
+# All four are in the same YAML file, so only the sed's range address keeps
+# them out of the branch list — which nothing else exercises.
 for bad in Feature/Capitalized feature/Has-Capitals feature/trailing- feature/double--hyphen \
-           nosuchtype/thing no-slash-at-all feature/ "feature/x y"; do
+           nosuchtype/thing no-slash-at-all feature/ "feature/x y" \
+           docs/only-a-commit-type perf/only-a-commit-type \
+           note/only-a-comment-label question/only-a-comment-label; do
   no "rejects '$bad'" check_branch "$bad"
 done
 
@@ -314,6 +319,76 @@ no "the teammate's bad commit is now rejected" \
    git -C "$MATE" commit -q -m "totally unconventional"
 ok "and a good one is accepted" \
    git -C "$MATE" commit -q -m "feat: something conventional"
+
+echo "== the branch check fails closed in CI and stays lenient locally"
+
+# In CI this hook is the only branch-name gate, so a config it cannot read
+# must stop the build rather than wave it through with a note on stderr.
+STRICT="$(new_repo strict)"
+"$INSTALL" "$STRICT" >/dev/null 2>&1
+cp "$STRICT/.claude/git-conventions.yaml" "$STRICT/healthy.yaml"
+
+rm "$STRICT/.claude/git-conventions.yaml"
+ok "a missing config does not block a local push" \
+   sh -c 'cd "$1" && ./.githooks/pre-push' _ "$STRICT"
+no "a missing config fails the check in CI" \
+   sh -c 'cd "$1" && CI=true COMMITTEE_BRANCH=feature/x ./.githooks/pre-push' _ "$STRICT"
+
+# Flow-style YAML is valid and js-yaml reads it, but the hook's sed cannot —
+# exactly the silent-disable this guards against.
+printf 'branch_types: [feature, fix]\ncommit_types:\n  - feat\n' > "$STRICT/.claude/git-conventions.yaml"
+no "an unreadable branch_types fails the check in CI" \
+   sh -c 'cd "$1" && CI=true COMMITTEE_BRANCH=feature/x ./.githooks/pre-push' _ "$STRICT"
+STRICT_OUT="$(cd "$STRICT" && CI=true COMMITTEE_BRANCH=feature/x ./.githooks/pre-push 2>&1 || true)"
+has "and says why it refused"  "$STRICT_OUT" "Refusing to skip"
+
+cp "$STRICT/healthy.yaml" "$STRICT/.claude/git-conventions.yaml"
+ok "a healthy config still passes in CI" \
+   sh -c 'cd "$1" && CI=true COMMITTEE_BRANCH=feature/x ./.githooks/pre-push' _ "$STRICT"
+
+echo "== the Skill is refreshed on re-install, and only the Skill"
+
+SK="$(new_repo skill)"
+"$INSTALL" "$SK" >/dev/null 2>&1
+echo "STALE MARKER" >> "$SK/.claude/skills/git-conventions/SKILL.md"
+mkdir -p "$SK/.claude/skills/my-own-skill"
+printf 'mine\n' > "$SK/.claude/skills/my-own-skill/SKILL.md"
+"$INSTALL" "$SK" >/dev/null 2>&1   # no --force: the Skill refreshes anyway
+
+no "a stale Skill is replaced without --force" \
+   grep -q 'STALE MARKER' "$SK/.claude/skills/git-conventions/SKILL.md"
+ok "a neighbouring skill is left alone" test -f "$SK/.claude/skills/my-own-skill/SKILL.md"
+
+echo "== the installer refuses to delete through a symlink"
+
+SYM="$(new_repo symlink)"
+OUTSIDE="$TMP_ROOT/outside-the-repo"
+mkdir -p "$OUTSIDE/git-conventions"
+printf 'precious\n' > "$OUTSIDE/git-conventions/SKILL.md"
+mkdir -p "$SYM/.claude"
+ln -s "$OUTSIDE" "$SYM/.claude/skills"
+no "installing through a symlinked skills dir is refused" "$INSTALL" "$SYM"
+ok "the directory it pointed at is untouched" grep -qx 'precious' "$OUTSIDE/git-conventions/SKILL.md"
+
+echo "== a git worktree is a valid target"
+
+# install.sh checks `-e .git` rather than `-d` precisely for this case: in a
+# worktree .git is a file. Nothing else in this suite creates one.
+WTBASE="$(new_repo wtbase)"
+echo seed > "$WTBASE/seed.txt"
+git -C "$WTBASE" add -A
+git -C "$WTBASE" -c core.hooksPath=/dev/null commit -q -m "chore: seed"
+WT="$TMP_ROOT/worktree"
+git -C "$WTBASE" worktree add -q "$WT" -b feature/from-a-worktree
+ok "installing into a worktree succeeds" "$INSTALL" "$WT"
+ok "and the hooks land there"            test -x "$WT/.githooks/commit-msg"
+
+echo "== the installed package.json is named after the repo"
+
+NAMED="$(new_repo my-service)"
+"$INSTALL" "$NAMED" >/dev/null 2>&1
+ok "the placeholder name is substituted" grep -q '"name": "my-service"' "$NAMED/package.json"
+no "no placeholder survives"             grep -q 'your-project' "$NAMED/package.json"
 
 echo
 echo "install_test: $PASSED passed, $FAILED failed"

@@ -110,6 +110,23 @@ install_file() {
 # This is the knowledge layer shipped by the kit, not a user customization
 # surface, so re-running the installer to pick up an updated Skill replaces it.
 mkdir -p "$TARGET_DIR/.claude/skills"
+
+# This is the one path the installer deletes, so make sure it is really
+# inside the target. A symlinked .claude or .claude/skills — a plausible way
+# to share one config across repos — would otherwise send `rm -rf` out of the
+# repository entirely, and the report would call it "(refreshed)".
+for _part in .claude .claude/skills .claude/skills/git-conventions; do
+  if [ -L "$TARGET_DIR/$_part" ]; then
+    echo "Error: $_part is a symlink; refusing to replace the Skill through it" >&2
+    echo "       Replace the symlink with a real directory, or install elsewhere." >&2
+    exit 1
+  fi
+done
+if [ "$(cd "$TARGET_DIR/.claude/skills" && pwd -P)" != "$(cd "$TARGET_DIR" && pwd -P)/.claude/skills" ]; then
+  echo "Error: $TARGET_DIR/.claude/skills resolves outside the target repository" >&2
+  exit 1
+fi
+
 rm -rf "$TARGET_DIR/.claude/skills/git-conventions"
 cp -r "$SRC_DIR/skills/git-conventions" "$TARGET_DIR/.claude/skills/git-conventions"
 WRITTEN="${WRITTEN}  .claude/skills/git-conventions/ (refreshed)"$'\n'
@@ -156,7 +173,14 @@ install_file "$SRC_DIR/templates/github-workflows/conventions.yml" "$TARGET_DIR/
 # --- Dev dependencies -------------------------------------------------------
 # commitlint is a Node program and commitlint.config.js requires js-yaml to
 # read git-conventions.yaml, so the target needs both declared somewhere.
-if ! install_file "$SRC_DIR/templates/package.json.example" "$TARGET_DIR/package.json"; then
+if install_file "$SRC_DIR/templates/package.json.example" "$TARGET_DIR/package.json"; then
+  # The template's placeholder name would otherwise ship as the repo's real
+  # package name, where Dependabot and GitHub language detection will find it.
+  _pkg_name="$(basename "$TARGET_DIR" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9._-]/-/g; s/^[._-]*//')"
+  [ -n "$_pkg_name" ] || _pkg_name="project"
+  sed -i.bak "s/\"name\": \"your-project\"/\"name\": \"$_pkg_name\"/" "$TARGET_DIR/package.json"
+  rm -f "$TARGET_DIR/package.json.bak"
+else
   MISSING_DEPS="yes"
 fi
 

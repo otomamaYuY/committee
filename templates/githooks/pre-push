@@ -19,9 +19,25 @@ case "$branch" in
   main|master|develop) exit 0 ;;
 esac
 
-if [ ! -f "$CONFIG" ]; then
-  echo "pre-push: $CONFIG not found — skipping the branch-name check." >&2
+# Fail closed where this hook is the gate and open where it is a
+# convenience. Locally, a missing config should not block someone mid-rebase
+# in a worktree; in CI it is the ONLY branch-name check, so skipping it there
+# would silently remove the control for every branch, with nothing but a
+# stderr line to say so.
+strict() { [ -n "${CI:-}" ] || [ -n "${COMMITTEE_BRANCH:-}" ]; }
+
+give_up() {
+  echo "pre-push: $1" >&2
+  if strict; then
+    echo "          Refusing to skip the branch-name check in CI." >&2
+    exit 1
+  fi
+  echo "          Skipping the branch-name check." >&2
   exit 0
+}
+
+if [ ! -f "$CONFIG" ]; then
+  give_up "$CONFIG not found."
 fi
 
 # Read the branch_types block without a YAML parser: this hook has to work in
@@ -33,8 +49,7 @@ types=$(
 )
 
 if [ -z "$types" ]; then
-  echo "pre-push: no branch_types found in $CONFIG — skipping the check." >&2
-  exit 0
+  give_up "no branch_types could be read from $CONFIG (is it a block sequence of plain strings?)."
 fi
 
 reject() {
