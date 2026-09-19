@@ -39,6 +39,7 @@ function read(rel) { return fs.readFileSync(path.join(ROOT, rel), 'utf8'); }
 // .github/workflows/test.yml is absent too — it tests the kit itself and is
 // not shipped to adopters.
 const PAIRS = [
+  ['AGENTS.md',                               'templates/AGENTS.md'],
   ['commitlint.config.js',                    'templates/commitlint.config.js'],
   ['.githooks/commit-msg',                    'templates/githooks/commit-msg'],
   ['.githooks/pre-push',                      'templates/githooks/pre-push'],
@@ -99,6 +100,14 @@ const hardcoded = conventions.branch_types.filter(
 if (hardcoded.length === 0) ok('pre-push hardcodes no branch types');
 else no('pre-push hardcodes no branch types',
         `found ${hardcoded.join(', ')} — the list belongs in git-conventions.yaml only`);
+
+// Both knowledge-layer files must point agents at the config rather than
+// carrying their own copy of the lists, or an edit to the yaml silently
+// stops matching what the agent was told.
+for (const doc of ['AGENTS.md', 'skills/git-conventions/SKILL.md']) {
+  if (read(doc).includes('git-conventions.yaml')) ok(`${doc} points at the conventions file`);
+  else no(`${doc} points at the conventions file`, 'it appears to carry its own list');
+}
 
 // --- 3. workflows are pinned, scoped, and injection-free ---------------------
 console.log('== workflows are pinned and scoped');

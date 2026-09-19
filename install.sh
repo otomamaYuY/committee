@@ -82,6 +82,7 @@ echo "Installing into: $TARGET_DIR (force: $FORCE)"
 WRITTEN=""
 SKIPPED=""
 MISSING_DEPS="no"
+MISSING_AGENTS="no"
 HOOKS_PATH_NOTE=""
 
 # Copy src -> dest unless dest already exists. Returns 1 (skipped) so callers
@@ -116,6 +117,14 @@ WRITTEN="${WRITTEN}  .claude/skills/git-conventions/ (refreshed)"$'\n'
 # --- Conventions config -----------------------------------------------------
 install_file "$SRC_DIR/templates/git-conventions.yaml" "$TARGET_DIR/.claude/git-conventions.yaml" || true
 install_file "$SRC_DIR/templates/commitlint.config.js" "$TARGET_DIR/commitlint.config.js" || true
+
+# The knowledge layer for agents that read AGENTS.md (Codex and others).
+# Claude Code gets the same content as a Skill, above. Plenty of repos
+# already have an AGENTS.md, so a skipped one is called out at the end
+# rather than left to be discovered later.
+if ! install_file "$SRC_DIR/templates/AGENTS.md" "$TARGET_DIR/AGENTS.md"; then
+  MISSING_AGENTS="yes"
+fi
 
 # --- Git hooks --------------------------------------------------------------
 mkdir -p "$TARGET_DIR/.githooks"
@@ -173,6 +182,16 @@ Warning: this repo already routes git hooks to '$HOOKS_PATH_NOTE', so
   Either call it from your existing hook, or move to the kit's hooks with:
 
       git config --local core.hooksPath .githooks
+WARN
+fi
+
+if [ "$MISSING_AGENTS" = "yes" ]; then
+  cat << 'WARN'
+
+Warning: this repo already has an AGENTS.md, so the conventions section was
+  NOT added. Agents that read AGENTS.md (Codex and others) will not be told
+  about the conventions, and will hit the hooks instead of following them.
+  Copy templates/AGENTS.md from the kit into a section of your own file.
 WARN
 fi
 

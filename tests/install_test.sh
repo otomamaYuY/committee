@@ -79,6 +79,7 @@ FRESH_OUT="$("$INSTALL" "$FRESH" 2>&1)"
 for f in .claude/git-conventions.yaml \
          .claude/skills/git-conventions/SKILL.md \
          commitlint.config.js \
+         AGENTS.md \
          .githooks/commit-msg \
          .githooks/pre-push \
          .github/workflows/conventions.yml \
@@ -113,10 +114,20 @@ ok "files absent from the target are still installed" test -f "$REPO/.githooks/c
 has "skipped files are reported"       "$OUT" "Skipped (already present"
 has "the report says how to override"  "$OUT" "Re-run with --force"
 has "a pre-existing package.json is warned about" "$OUT" "NOT added"
+has "the Codex knowledge layer is installed too" "$FRESH_OUT" "AGENTS.md"
 has "the warning names what the hook needs"       "$OUT" "@commitlint/cli"
 
 "$INSTALL" "$REPO" --force >/dev/null 2>&1
 ok "--force overwrites an existing file" grep -q 'git-conventions' "$REPO/commitlint.config.js"
+
+echo "== an existing AGENTS.md is preserved and called out"
+
+AG="$(new_repo agents)"
+printf '# my own agent notes\n' > "$AG/AGENTS.md"
+AG_OUT="$("$INSTALL" "$AG" 2>&1)"
+ok "a pre-existing AGENTS.md survives" grep -qx '# my own agent notes' "$AG/AGENTS.md"
+has "the skipped AGENTS.md is warned about" "$AG_OUT" "already has an AGENTS.md"
+has "the warning says what to do"           "$AG_OUT" "templates/AGENTS.md"
 
 echo "== a repo that already routes hooks elsewhere is not hijacked"
 
