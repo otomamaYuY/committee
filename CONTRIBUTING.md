@@ -11,6 +11,28 @@ This repo dogfoods its own conventions:
 1. Fork and branch from `main` (e.g. `feature/add-pnpm-example`).
 2. Make your change with a matching commit message
    (e.g. `docs: clarify pixi install steps`).
-3. Open a PR — `commit-check` runs automatically on it.
-4. Merges to `main` trigger `semantic-release`; you don't need to bump any
+3. Run `npm test` before opening the PR.
+4. Open a PR — `commit-check` and `test` run automatically on it.
+5. Merges to `main` trigger `semantic-release`; you don't need to bump any
    version number yourself.
+
+## Tests
+
+`npm test` runs two suites, neither of which needs a test framework:
+
+- `tests/install_test.sh` — contract tests for `install.sh`: argument
+  validation happens before anything is written, existing files in the target
+  repo are never overwritten without `--force`, the toolchain substitutions
+  actually took effect, and the commit-type list in `git-conventions.yaml` is
+  what commitlint enforces.
+- `tests/drift_test.js` — catches the two duplications that rot silently: the
+  root files this repo dogfoods against their `templates/` counterparts, and
+  the type/branch lists in `.claude/git-conventions.yaml` against the regexes
+  in `.commit-check.yml`, which cannot import YAML.
+
+Both failure modes are quiet in production — a stale `templates/` copy still
+leaves CI green here while shipping the unfixed file to every adopting repo —
+so please add a case rather than only fixing the symptom.
+
+If you touch `install.sh`, also run `shellcheck --severity=error install.sh`;
+CI does.

@@ -1,0 +1,27 @@
+# This workflow tests the kit itself and is deliberately NOT mirrored under
+# templates/ — adopting repos receive commit-check.yml and release.yml only.
+# tests/drift_test.js knows about that asymmetry.
+name: test
+on:
+  pull_request:
+  push:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      # Errors only: install.sh is the artifact that writes into other people's
+      # repositories, so a genuine bug must fail the build, while style nits
+      # should not block a PR.
+      - name: shellcheck
+        run: shellcheck --severity=error install.sh tests/install_test.sh
+      - name: tests
+        run: npm test
