@@ -113,6 +113,49 @@ done
 ok "git-conventions.yaml keeps its option-list comment" \
    grep -q '# npm | pnpm' "$TMP_ROOT/tc-pixi/.claude/git-conventions.yaml"
 
+# commitlint is a Node program and commitlint.config.js requires js-yaml, so
+# the JS dependencies are needed regardless of how Node itself is provisioned.
+# pixi and nix used to skip them, leaving the hook failing on every commit.
+echo "== every toolchain gets the Node dev dependencies"
+
+for tc in npm pnpm yarn pixi nix; do
+  R="$TMP_ROOT/tc-$tc"
+  ok "--toolchain $tc installs a package.json" test -f "$R/package.json"
+  for dep in @commitlint/cli @commitlint/config-conventional js-yaml husky; do
+    ok "--toolchain $tc declares $dep" grep -q "\"$dep\"" "$R/package.json"
+  done
+  ok "--toolchain $tc defines an install command for 'make deps'" \
+     grep -qE "^ *DEPS := .+" "$R/Makefile"
+done
+
+ok "pixi runs npm install inside its environment" \
+   grep -q 'DEPS := pixi install && pixi run npm install' "$TMP_ROOT/tc-pixi/Makefile"
+ok "nix runs npm install inside its environment" \
+   grep -q 'DEPS := nix develop --command npm install' "$TMP_ROOT/tc-nix/Makefile"
+
+echo "== a target that already has a package.json is warned, not left silent"
+
+WARN_REPO="$(new_repo prewarn)"
+printf '{"name":"mine"}\n' > "$WARN_REPO/package.json"
+WARN_OUT="$("$INSTALL" "$WARN_REPO" --toolchain npm 2>&1)"
+case "$WARN_OUT" in
+  *"dev dependencies"*"NOT added"*) pass "an existing package.json produces a warning" ;;
+  *)                                fail "an existing package.json is skipped silently" ;;
+esac
+ok "the warning names the packages the hook needs" \
+   sh -c 'case "$1" in *"@commitlint/cli"*) exit 0 ;; *) exit 1 ;; esac' _ "$WARN_OUT"
+
+echo "== the hook explains a missing commitlint instead of failing as npx"
+
+HOOK_REPO="$(new_repo hookmsg)"
+"$INSTALL" "$HOOK_REPO" --toolchain npm >/dev/null 2>&1
+printf 'feat: x\n' > "$HOOK_REPO/msg"
+HOOK_OUT="$(make -C "$HOOK_REPO" commit-lint MSG="$HOOK_REPO/msg" 2>&1 || true)"
+case "$HOOK_OUT" in
+  *"make deps"*) pass "a missing commitlint points at 'make deps'" ;;
+  *)             fail "a missing commitlint gives no actionable message" ;;
+esac
+
 # The substitutions depend on the exact first-line spelling of two templates.
 # sed exits 0 on a miss, so without verify_line() a reformat would install a
 # silently wrong toolchain and surface much later as "commitlint: not found".

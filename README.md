@@ -100,6 +100,13 @@ actually takes effect). The git hook runs `make` with no environment of its
 own, so the `Makefile` default is what routes; override it per-invocation
 with `make commit-lint TOOLCHAIN=pixi` if you need to.
 
+All five toolchains need the same Node packages — `commitlint` is a Node
+program and `commitlint.config.js` requires `js-yaml` to read
+`git-conventions.yaml`. `pixi` and `nix` only change how Node itself is
+provisioned, so they run the same `npm install` inside their activated
+environment. `make deps` runs whichever command is right for the baked-in
+toolchain; run it once after installing.
+
 The choice is invisible to Claude Code — it only ever runs plain
 `git commit` / `git checkout -b`; the git hook and `Makefile` route to the
 right runtime underneath.

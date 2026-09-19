@@ -92,6 +92,7 @@ echo "Installing into: $TARGET_DIR (toolchain: $TOOLCHAIN, force: $FORCE)"
 
 WRITTEN=""
 SKIPPED=""
+MISSING_DEPS="no"
 
 # Copy src -> dest unless dest already exists. Returns 1 (skipped) so callers
 # can gate follow-up work such as a toolchain substitution on the copy having
@@ -180,10 +181,16 @@ case "$TOOLCHAIN" in
     install_file "$SRC_DIR/templates/flake.nix.example" "$TARGET_DIR/flake.nix" || true
     install_file "$SRC_DIR/templates/.envrc.example"    "$TARGET_DIR/.envrc"    || true
     ;;
-  npm|pnpm|yarn)
-    install_file "$SRC_DIR/templates/package.json.example" "$TARGET_DIR/package.json" || true
-    ;;
 esac
+
+# Every toolchain needs the Node dev dependencies, not just the JS ones:
+# commitlint is a Node program and commitlint.config.js requires js-yaml to
+# read git-conventions.yaml. pixi and nix provision Node itself and then run
+# the same `npm install` inside their environment. Skipping this on those two
+# paths left the commit hook failing on every commit.
+if ! install_file "$SRC_DIR/templates/package.json.example" "$TARGET_DIR/package.json"; then
+  MISSING_DEPS="yes"
+fi
 
 # --- Report -----------------------------------------------------------------
 echo
@@ -199,14 +206,29 @@ if [ -n "$SKIPPED" ]; then
   echo "  need their current contents."
 fi
 
+if [ "$MISSING_DEPS" = "yes" ]; then
+  cat << 'WARN'
+
+Warning: this repo already has a package.json, so the kit's dev dependencies
+  were NOT added. The commit hook needs all of these:
+
+      @commitlint/cli  @commitlint/config-conventional  js-yaml  husky
+
+  Add them yourself before committing, or every commit will be rejected with a
+  module-resolution error that names none of this. See package.json.example in
+  the kit for the versions it expects.
+WARN
+fi
+
 cat << 'MSG'
 
 Next steps:
   1. Review .claude/git-conventions.yaml (type/branch/label lists).
-  2. Install dependencies for your toolchain:
-       npm/pnpm/yarn : npm install   (or pnpm/yarn install)
-       pixi          : pixi install
-       nix           : direnv allow   (or: nix develop)
+  2. Install dependencies:
+       make deps
+     This runs the right command for the toolchain baked into the Makefile —
+     including inside the pixi or nix environment, which still need the Node
+     packages that commitlint and commitlint.config.js depend on.
   3. Enable hooks:
        npx husky init   # if not already set up in this repo
   4. Commit the new files.
