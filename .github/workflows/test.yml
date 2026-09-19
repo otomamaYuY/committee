@@ -18,10 +18,12 @@ jobs:
           node-version: 20
           cache: npm
       - run: npm ci
-      # Errors only: install.sh is the artifact that writes into other people's
-      # repositories, so a genuine bug must fail the build, while style nits
-      # should not block a PR.
+      # Warnings, not just errors. --severity=error catches little more than
+      # parse failures, and the class that actually matters here is the one
+      # below it: an unquoted variable in a script that runs rm -rf against a
+      # path the caller supplied. install.sh writes into other people's
+      # repositories, so it is held to that.
       - name: shellcheck
-        run: shellcheck --severity=error install.sh tests/install_test.sh templates/githooks/*
+        run: shellcheck --severity=warning install.sh tests/install_test.sh templates/githooks/*
       - name: tests
         run: npm test

@@ -37,7 +37,7 @@ leaves CI green here while shipping the unfixed file to every adopting repo —
 so please add a case rather than only fixing the symptom.
 
 If you touch a shell file, also run
-`shellcheck --severity=error install.sh tests/install_test.sh templates/githooks/*`;
+`shellcheck --severity=warning install.sh tests/install_test.sh templates/githooks/*`;
 CI does.
 
 ## The duplication is deliberate
