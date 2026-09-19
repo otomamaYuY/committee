@@ -241,6 +241,40 @@ no "a malformed branch name is rejected on push" git -C "$PUSH" push -q origin N
 git -C "$PUSH" checkout -q -b feature/properly-named
 ok "a conventional branch name pushes"           git -C "$PUSH" push -q origin feature/properly-named
 
+echo "== a broken conventions file blames itself, not commitlint.config.js"
+
+# Left to itself commitlint reports "Please add rules to your
+# commitlint.config.js" for a missing config and "type must be one of []" for
+# a typo'd key — both send the reader to edit the wrong file.
+CFG="$(new_repo cfg)"
+"$INSTALL" "$CFG" >/dev/null 2>&1
+ln -s "$KIT_DIR/node_modules" "$CFG/node_modules"
+printf 'feat: x\n' > "$CFG/msg"
+cp "$CFG/.claude/git-conventions.yaml" "$CFG/healthy.yaml"
+
+run_hook() { (cd "$CFG" && ./.githooks/commit-msg msg 2>&1 || true); }
+
+rm "$CFG/.claude/git-conventions.yaml"
+CFG_OUT="$(run_hook)"
+has "a missing conventions file is named"      "$CFG_OUT" "cannot read the conventions file"
+has "and the path is printed"                  "$CFG_OUT" "git-conventions.yaml"
+has "and a fix is offered"                     "$CFG_OUT" "install.sh"
+
+cp "$CFG/healthy.yaml" "$CFG/.claude/git-conventions.yaml"
+sed -i.bak 's/^commit_types:/commit_type:/' "$CFG/.claude/git-conventions.yaml"
+CFG_OUT="$(run_hook)"
+has "a typo in the commit_types key is named"  "$CFG_OUT" 'no non-empty "commit_types:" list'
+has "and the typo is suggested as the cause"   "$CFG_OUT" "typo"
+
+cp "$CFG/healthy.yaml" "$CFG/.claude/git-conventions.yaml"
+printf '\n  bad: [unclosed\n' >> "$CFG/.claude/git-conventions.yaml"
+CFG_OUT="$(run_hook)"
+has "malformed YAML is reported as YAML"       "$CFG_OUT" "not valid YAML"
+
+cp "$CFG/healthy.yaml" "$CFG/.claude/git-conventions.yaml"
+ok "a healthy config still accepts a good message" \
+   sh -c 'cd "$1" && ./.githooks/commit-msg msg' _ "$CFG"
+
 echo
 echo "install_test: $PASSED passed, $FAILED failed"
 [ "$FAILED" -eq 0 ]
