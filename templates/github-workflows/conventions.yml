@@ -38,6 +38,9 @@ jobs:
         run: npx --no -- commitlint --from "$BASE_SHA" --to "$HEAD_SHA" --verbose
 
       # The same hook developers run locally, so CI cannot disagree with it.
+      # This deliberately runs the hook from the PR's own checkout: a PR that
+      # fixes the hook has to be testable. The job holds only contents: read
+      # and no secrets, so what a PR can reach here it could reach anyway.
       - name: branch name
         env:
           COMMITTEE_BRANCH: ${{ github.head_ref }}

@@ -358,6 +358,13 @@ printf 'mine\n' > "$SK/.claude/skills/my-own-skill/SKILL.md"
 no "a stale Skill is replaced without --force" \
    grep -q 'STALE MARKER' "$SK/.claude/skills/git-conventions/SKILL.md"
 ok "a neighbouring skill is left alone" test -f "$SK/.claude/skills/my-own-skill/SKILL.md"
+ok "the replaced copy is kept as a backup" \
+   grep -q 'STALE MARKER' "$SK/.claude/skills/git-conventions.bak/SKILL.md"
+
+SK2="$(new_repo skill-clean)"
+"$INSTALL" "$SK2" >/dev/null 2>&1
+"$INSTALL" "$SK2" >/dev/null 2>&1
+no "an unmodified Skill leaves no stray backup" test -e "$SK2/.claude/skills/git-conventions.bak"
 
 echo "== the installer refuses to delete through a symlink"
 

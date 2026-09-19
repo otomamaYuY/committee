@@ -127,9 +127,19 @@ if [ "$(cd "$TARGET_DIR/.claude/skills" && pwd -P)" != "$(cd "$TARGET_DIR" && pw
   exit 1
 fi
 
-rm -rf "$TARGET_DIR/.claude/skills/git-conventions"
-cp -r "$SRC_DIR/skills/git-conventions" "$TARGET_DIR/.claude/skills/git-conventions"
-WRITTEN="${WRITTEN}  .claude/skills/git-conventions/ (refreshed)"$'\n'
+# Replacing is the point — it is how an adopter picks up an updated Skill —
+# but edits someone made to their copy should not vanish without a trace.
+_skill_dest="$TARGET_DIR/.claude/skills/git-conventions"
+_skill_note="(refreshed)"
+if [ -d "$_skill_dest" ] && ! diff -r -q "$SRC_DIR/skills/git-conventions" "$_skill_dest" >/dev/null 2>&1; then
+  rm -rf "$_skill_dest.bak"
+  cp -r "$_skill_dest" "$_skill_dest.bak"
+  _skill_note="(refreshed — your previous copy differed and was kept as git-conventions.bak)"
+fi
+
+rm -rf "$_skill_dest"
+cp -r "$SRC_DIR/skills/git-conventions" "$_skill_dest"
+WRITTEN="${WRITTEN}  .claude/skills/git-conventions/ $_skill_note"$'\n'
 
 # --- Conventions config -----------------------------------------------------
 install_file "$SRC_DIR/templates/git-conventions.yaml" "$TARGET_DIR/.claude/git-conventions.yaml" || true
