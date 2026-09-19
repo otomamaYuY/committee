@@ -131,5 +131,40 @@ for (const [name, expected] of branchCases) {
   else no(`branch "${name}" should be ${expected ? 'accepted' : 'rejected'}`);
 }
 
+// --- 4. third-party actions must be pinned to a commit ----------------------
+// A tag is mutable: `@v1` resolves at run time to whatever that repository's
+// maintainer — or whoever compromises it — has v1 pointing at. Actions under
+// actions/ are GitHub's own and are left on their major tag deliberately.
+console.log('== third-party actions are pinned to a commit SHA');
+
+const WORKFLOW_DIRS = ['.github/workflows', 'templates/github-workflows'];
+
+for (const dir of WORKFLOW_DIRS) {
+  for (const name of fs.readdirSync(path.join(ROOT, dir)).sort()) {
+    const text = read(path.join(dir, name));
+    for (const m of text.matchAll(/uses:\s*(\S+)/g)) {
+      const ref = m[1];
+      if (ref.startsWith('actions/')) continue;
+      const desc = `${dir}/${name}: ${ref.split('@')[0]}`;
+      if (/@[0-9a-f]{40}$/.test(ref)) ok(`${desc} is SHA-pinned`);
+      else no(`${desc} is SHA-pinned`, `pinned to "${ref.split('@')[1]}" — a mutable tag`);
+    }
+  }
+}
+
+// --- 5. workflows declare their token scope ---------------------------------
+console.log('== workflows declare permissions explicitly');
+
+for (const dir of WORKFLOW_DIRS) {
+  for (const name of fs.readdirSync(path.join(ROOT, dir)).sort()) {
+    const wf = yaml.load(read(path.join(dir, name)));
+    const declared = wf.permissions !== undefined
+      || Object.values(wf.jobs || {}).every(j => j.permissions !== undefined);
+    if (declared) ok(`${dir}/${name} declares permissions`);
+    else no(`${dir}/${name} declares permissions`,
+            'without it the job inherits the repository default, which may be read-write');
+  }
+}
+
 console.log(`\ndrift_test: ${passed} passed, ${failed} failed`);
 process.exit(failed === 0 ? 0 : 1);
