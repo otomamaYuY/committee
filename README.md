@@ -107,10 +107,14 @@ re-implementation of it, so the two cannot drift apart.
 
 ## Requirements
 
-Node, and one of npm, pnpm or yarn. The hooks resolve `commitlint` from
-`node_modules/.bin`, which all three populate. The whole kit is three dev
-dependencies: `@commitlint/cli`, `@commitlint/config-conventional` and
-`js-yaml`.
+Node, and a package manager that populates `node_modules/.bin` — the hooks
+resolve `commitlint` from there. npm is what the test suite exercises; pnpm
+and Yarn Classic work by the same mechanism. **Yarn PnP does not**, because
+it deliberately has no `node_modules`; use `nodeLinker: node-modules`, or
+call commitlint through `yarn commitlint` in your own hook.
+
+The whole kit is three dev dependencies: `@commitlint/cli`,
+`@commitlint/config-conventional` and `js-yaml`.
 
 The `pre-push` hook parses the YAML with `sed`, so branch checking works in
 a fresh clone before anything has been installed.

@@ -14,7 +14,8 @@ message, or review comment; do not assume a fixed list.
 
 - **Branch** — [Conventional Branch](https://conventionalbranch.org):
   `<type>/<description>` (lowercase, hyphen-separated). Claude Code's own
-  branches use the `claude/` prefix. `main`/`master`/`develop` need no prefix.
+  branches use the `claude/` prefix, so a reviewer can tell at a glance where
+  a branch came from. `main`/`master`/`develop` need no prefix.
 - **Commit** — [Conventional Commits](https://www.conventionalcommits.org):
   `<type>[optional scope]: <description>`. Breaking change: `!` after
   type/scope, or a `BREAKING CHANGE:` footer.
@@ -27,6 +28,15 @@ message, or review comment; do not assume a fixed list.
   **No linter checks this one — this skill is the only safeguard.** Pick the
   type/label that actually matches the change, not just one that happens to
   be on the allowed list.
+
+## When a hook rejects you
+
+A `commit-msg` hook and a `pre-push` hook run automatically, and CI repeats
+both. If one rejects you, read what it printed and fix the cause. Do **not**
+pass `--no-verify`, and do not edit or disable a hook to get a commit
+through — that turns off the layer these conventions rely on. If a type you
+genuinely need is missing, add it to `.claude/git-conventions.yaml`: every
+layer reads that file, so one edit changes what is allowed everywhere.
 
 ## Why this matters beyond formatting
 
