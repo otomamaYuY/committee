@@ -36,14 +36,11 @@ Neither layer alone is enough:
 ```
 skills/git-conventions/SKILL.md   # knowledge layer (Agent Skill)
 templates/
-├── git-conventions.yaml          # single source of truth: allowed types/labels + toolchain choice
+├── git-conventions.yaml          # single source of truth: allowed types/labels
 ├── commitlint.config.js          # reads git-conventions.yaml directly
 ├── .commit-check.yml             # branch-name + commit-message regex (manually synced — see comment)
-├── Makefile                      # one entry point across npm/pnpm/yarn/pixi/nix
 ├── package.json.example
-├── pixi.toml.example
-├── flake.nix.example / .envrc.example
-├── husky/commit-msg
+├── githooks/commit-msg
 └── github-workflows/commit-check.yml
 install.sh                        # copies the above into a target repo
 ```
@@ -60,19 +57,19 @@ npx skills add otomamaYuY/committee --skill git-conventions
 
 ```bash
 git clone https://github.com/otomamaYuY/committee.git /tmp/committee
-/tmp/committee/install.sh /path/to/your/repo --toolchain npm   # or pnpm | yarn | pixi | nix
+/tmp/committee/install.sh /path/to/your/repo
 ```
 
 This copies the Skill into `.claude/skills/git-conventions/`, the config
-files into your repo root, and sets `toolchain:` in
-`.claude/git-conventions.yaml`. The script prints next steps (installing
-dependencies, enabling the git hook) when it finishes.
+files into your repo root, and points `core.hooksPath` at the tracked
+`.githooks/` directory — so the hook is live with no separate init step to
+forget. The script prints next steps when it finishes.
 
 The target must already exist and be a git repository — the commit hook and
 the workflows do nothing outside one.
 
 **Existing files are never overwritten.** Installing into a repo that already
-has its own `Makefile`, `package.json` or `.github/workflows/commit-check.yml`
+has its own `commitlint.config.js`, `package.json` or workflow of the same name
 leaves those untouched and lists them under `Skipped` at the end, so you can
 merge what you need by hand. Pass `--force` to overwrite them instead, once
 you have checked you don't need their current contents. The Skill itself is
@@ -87,33 +84,12 @@ can't import YAML, so it's kept in manual sync (called out in a comment in
 that file); low-churn in practice since most projects stick to the default
 `@commitlint/config-conventional` type set.
 
-## Picking a toolchain
-
-`--toolchain` selects how `Makefile` runs the underlying tools: `npm` /
-`pnpm` / `yarn` run them directly; `pixi` / `nix` first activate a
-provisioned environment (Node + Python) and then run the same tools inside
-it. `install.sh` records the choice in two places — `toolchain:` in
-`.claude/git-conventions.yaml` (documentation, read by humans and the Skill)
-and the `TOOLCHAIN ?=` default at the top of `Makefile` (the value that
-actually takes effect). The git hook runs `make` with no environment of its
-own, so the `Makefile` default is what routes; override it per-invocation
-with `make commit-lint TOOLCHAIN=pixi` if you need to.
-
-All five toolchains need the same Node packages — `commitlint` is a Node
-program and `commitlint.config.js` requires `js-yaml` to read
-`git-conventions.yaml`. `pixi` and `nix` only change how Node itself is
-provisioned, so they run the same `npm install` inside their activated
-environment. `make deps` runs whichever command is right for the baked-in
-toolchain; run it once after installing.
-
-The choice is invisible to Claude Code — it only ever runs plain
-`git commit` / `git checkout -b`; the git hook and `Makefile` route to the
-right runtime underneath.
-
 ## This repo dogfoods itself
 
-This repo was scaffolded with its own `install.sh --toolchain npm`. See the
-root `.claude/`, `Makefile`, and `commitlint.config.js` for a live example.
+This repo was scaffolded with its own `install.sh`. See the root `.claude/`,
+`.githooks/`, and `commitlint.config.js` for a live example — and
+`tests/drift_test.js`, which fails if those copies ever drift from
+`templates/`.
 
 ## License
 

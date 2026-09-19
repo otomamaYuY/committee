@@ -1,15 +1,15 @@
 #!/usr/bin/env bash
 # Contract tests for install.sh.
 #
-# These pin the three behaviours that a pre-merge review found broken, each of
-# which fails silently rather than loudly if it regresses:
-#   1. Existing files in the target repo are never overwritten without --force.
-#   2. Arguments are validated before anything is written (the target directory
-#      feeds rm -rf / mkdir / cp).
-#   3. The toolchain substitutions actually took effect — sed exits 0 when it
-#      matches nothing.
-# Plus a happy-path check that the commit-type list in git-conventions.yaml is
-# really what commitlint enforces.
+# The properties pinned here all fail quietly rather than loudly if they
+# regress, which is what makes them worth a test:
+#   1. Arguments are validated before anything is written — the target
+#      directory feeds rm -rf / mkdir / cp.
+#   2. Existing files in the target repo are never overwritten without --force.
+#   3. The hooks are actually wired up (core.hooksPath), and a repo that
+#      already routes hooks elsewhere is not hijacked.
+#   4. A real commit in a real installed repo is accepted or rejected
+#      according to the type list in git-conventions.yaml.
 #
 # Plain bash, no test framework: the kit must be testable in a repo that has
 # not installed anything yet.
@@ -32,13 +32,16 @@ fail() { FAILED=$((FAILED + 1)); printf '  FAIL %s\n' "$1"; }
 ok() { desc="$1"; shift; if "$@" >/dev/null 2>&1; then pass "$desc"; else fail "$desc"; fi; }
 # no <description> <command...> — expects the command to fail.
 no() { desc="$1"; shift; if "$@" >/dev/null 2>&1; then fail "$desc"; else pass "$desc"; fi; }
+# has <description> <haystack> <needle>
+has() { case "$2" in *"$3"*) pass "$1" ;; *) fail "$1" ;; esac; }
 
-# A throwaway git repo to install into.
 new_repo() {
   _dir="$TMP_ROOT/$1"
   rm -rf "$_dir"
   mkdir -p "$_dir"
   git -C "$_dir" init -q
+  git -C "$_dir" config user.email committee-test@example.invalid
+  git -C "$_dir" config user.name "committee test"
   printf '%s' "$_dir"
 }
 
@@ -53,10 +56,9 @@ else
 fi
 
 no "unknown option is rejected"          "$INSTALL" --bogus
+no "a removed option is rejected"        "$INSTALL" "$(new_repo argv0)" --toolchain npm
 no "empty target is rejected"            "$INSTALL" ""
 no "nonexistent target is rejected"      "$INSTALL" "$TMP_ROOT/does-not-exist"
-no "--toolchain without a value is rejected" "$INSTALL" "$(new_repo argv1)" --toolchain
-no "unknown toolchain is rejected"       "$INSTALL" "$(new_repo argv2)" --toolchain bogus
 no "two target directories are rejected" "$INSTALL" "$(new_repo argv3)" "$(new_repo argv4)"
 no "installing into the kit's own source is rejected" "$INSTALL" "$KIT_DIR"
 
@@ -69,135 +71,112 @@ else
   fail "wrote into a target that was then rejected"
 fi
 
+echo "== a clean install puts every file where the docs say"
+
+FRESH="$(new_repo fresh)"
+FRESH_OUT="$("$INSTALL" "$FRESH" 2>&1)"
+
+for f in .claude/git-conventions.yaml \
+         .claude/skills/git-conventions/SKILL.md \
+         commitlint.config.js \
+         .githooks/commit-msg \
+         .github/workflows/commit-check.yml \
+         package.json; do
+  ok "installs $f" test -f "$FRESH/$f"
+done
+ok "the commit-msg hook is executable" test -x "$FRESH/.githooks/commit-msg"
+ok "core.hooksPath points at the tracked hooks" \
+   sh -c '[ "$(git -C "$1" config --local --get core.hooksPath)" = ".githooks" ]' _ "$FRESH"
+ok "package.json declares commitlint"  grep -q '@commitlint/cli' "$FRESH/package.json"
+ok "package.json declares the config"  grep -q '@commitlint/config-conventional' "$FRESH/package.json"
+ok "package.json declares js-yaml"     grep -q 'js-yaml' "$FRESH/package.json"
+no "no Makefile is installed"          test -e "$FRESH/Makefile"
+no "no release config is installed"    test -e "$FRESH/.releaserc.json"
+no "nothing depends on husky"          grep -q 'husky' "$FRESH/package.json"
+
 echo "== no-clobber"
 
 REPO="$(new_repo clobber)"
 mkdir -p "$REPO/.github/workflows"
-printf 'MY REAL MAKEFILE\n' > "$REPO/Makefile"
 printf 'name: my real workflow\n' > "$REPO/.github/workflows/commit-check.yml"
-printf '{"name":"mine"}\n'  > "$REPO/package.json"
+printf 'module.exports = { mine: true };\n' > "$REPO/commitlint.config.js"
+printf '{"name":"mine"}\n' > "$REPO/package.json"
 
-OUT="$("$INSTALL" "$REPO" --toolchain npm 2>&1)"
+OUT="$("$INSTALL" "$REPO" 2>&1)"
 
-ok "pre-existing Makefile survives"     grep -qx 'MY REAL MAKEFILE' "$REPO/Makefile"
-ok "pre-existing workflow survives"      grep -qx 'name: my real workflow' "$REPO/.github/workflows/commit-check.yml"
-ok "pre-existing package.json survives" grep -q  '"name":"mine"'    "$REPO/package.json"
-ok "files absent from the target are installed" test -f "$REPO/commitlint.config.js"
-ok "the Skill is installed"             test -f "$REPO/.claude/skills/git-conventions/SKILL.md"
+ok "pre-existing workflow survives"    grep -qx 'name: my real workflow' "$REPO/.github/workflows/commit-check.yml"
+ok "pre-existing config survives"      grep -q  'mine: true'             "$REPO/commitlint.config.js"
+ok "pre-existing package.json survives" grep -q '"name":"mine"'          "$REPO/package.json"
+ok "files absent from the target are still installed" test -f "$REPO/.githooks/commit-msg"
+has "skipped files are reported"       "$OUT" "Skipped (already present"
+has "the report says how to override"  "$OUT" "Re-run with --force"
+has "a pre-existing package.json is warned about" "$OUT" "NOT added"
+has "the warning names what the hook needs"       "$OUT" "@commitlint/cli"
 
-case "$OUT" in
-  *"Skipped (already present"*) pass "skipped files are reported" ;;
-  *)                            fail "skipped files are not reported" ;;
-esac
-case "$OUT" in
-  *"Re-run with --force"*) pass "the report says how to override" ;;
-  *)                       fail "the report does not mention --force" ;;
-esac
+"$INSTALL" "$REPO" --force >/dev/null 2>&1
+ok "--force overwrites an existing file" grep -q 'git-conventions' "$REPO/commitlint.config.js"
 
-"$INSTALL" "$REPO" --toolchain npm --force >/dev/null 2>&1
-ok "--force overwrites an existing file" grep -qx 'TOOLCHAIN ?= npm' "$REPO/Makefile"
+echo "== a repo that already routes hooks elsewhere is not hijacked"
 
-echo "== toolchain substitution is verified, not assumed"
+HOOKED="$(new_repo hooked)"
+git -C "$HOOKED" config --local core.hooksPath .husky/_
+HOOKED_OUT="$("$INSTALL" "$HOOKED" 2>&1)"
+ok "the existing hooksPath is left alone" \
+   sh -c '[ "$(git -C "$1" config --local --get core.hooksPath)" = ".husky/_" ]' _ "$HOOKED"
+has "the collision is reported"        "$HOOKED_OUT" "already routes git hooks"
+has "the report says how to switch"    "$HOOKED_OUT" "core.hooksPath .githooks"
 
-for tc in npm pnpm yarn pixi nix; do
-  R="$(new_repo "tc-$tc")"
-  if "$INSTALL" "$R" --toolchain "$tc" >/dev/null 2>&1; then
-    ok "--toolchain $tc bakes the Makefile default" grep -qx "TOOLCHAIN ?= $tc" "$R/Makefile"
-    ok "--toolchain $tc records the choice in git-conventions.yaml" \
-       grep -qE "^toolchain: $tc( |\$)" "$R/.claude/git-conventions.yaml"
-  else
-    fail "--toolchain $tc install failed"
-  fi
-done
+echo "== the hook says what is missing when commitlint is absent"
 
-ok "git-conventions.yaml keeps its option-list comment" \
-   grep -q '# npm | pnpm' "$TMP_ROOT/tc-pixi/.claude/git-conventions.yaml"
+BARE="$(new_repo bare)"
+"$INSTALL" "$BARE" >/dev/null 2>&1
+printf 'feat: x\n' > "$BARE/msg"
+# git runs hooks with the repo root as cwd; npx resolves node_modules from
+# there, so running the hook from anywhere else would find the wrong tree.
+BARE_OUT="$(cd "$BARE" && ./.githooks/commit-msg msg 2>&1 || true)"
+has "a missing commitlint names itself" "$BARE_OUT" "commitlint is not installed"
+has "and says how to fix it"            "$BARE_OUT" "npm install"
 
-# commitlint is a Node program and commitlint.config.js requires js-yaml, so
-# the JS dependencies are needed regardless of how Node itself is provisioned.
-# pixi and nix used to skip them, leaving the hook failing on every commit.
-echo "== every toolchain gets the Node dev dependencies"
+echo "== end to end: a real commit in a real installed repo"
 
-for tc in npm pnpm yarn pixi nix; do
-  R="$TMP_ROOT/tc-$tc"
-  ok "--toolchain $tc installs a package.json" test -f "$R/package.json"
-  for dep in @commitlint/cli @commitlint/config-conventional js-yaml husky; do
-    ok "--toolchain $tc declares $dep" grep -q "\"$dep\"" "$R/package.json"
-  done
-  ok "--toolchain $tc defines an install command for 'make deps'" \
-     grep -qE "^ *DEPS := .+" "$R/Makefile"
-done
+E2E="$(new_repo e2e)"
+"$INSTALL" "$E2E" >/dev/null 2>&1
+# Borrow the kit's own node_modules rather than reinstalling: this exercises
+# the installed hook, not npm.
+ln -s "$KIT_DIR/node_modules" "$E2E/node_modules"
+echo hello > "$E2E/file.txt"
+git -C "$E2E" add -A
 
-ok "pixi runs npm install inside its environment" \
-   grep -q 'DEPS := pixi install && pixi run npm install' "$TMP_ROOT/tc-pixi/Makefile"
-ok "nix runs npm install inside its environment" \
-   grep -q 'DEPS := nix develop --command npm install' "$TMP_ROOT/tc-nix/Makefile"
-
-echo "== a target that already has a package.json is warned, not left silent"
-
-WARN_REPO="$(new_repo prewarn)"
-printf '{"name":"mine"}\n' > "$WARN_REPO/package.json"
-WARN_OUT="$("$INSTALL" "$WARN_REPO" --toolchain npm 2>&1)"
-case "$WARN_OUT" in
-  *"dev dependencies"*"NOT added"*) pass "an existing package.json produces a warning" ;;
-  *)                                fail "an existing package.json is skipped silently" ;;
-esac
-ok "the warning names the packages the hook needs" \
-   sh -c 'case "$1" in *"@commitlint/cli"*) exit 0 ;; *) exit 1 ;; esac' _ "$WARN_OUT"
-
-echo "== the hook explains a missing commitlint instead of failing as npx"
-
-HOOK_REPO="$(new_repo hookmsg)"
-"$INSTALL" "$HOOK_REPO" --toolchain npm >/dev/null 2>&1
-printf 'feat: x\n' > "$HOOK_REPO/msg"
-HOOK_OUT="$(make -C "$HOOK_REPO" commit-lint MSG="$HOOK_REPO/msg" 2>&1 || true)"
-case "$HOOK_OUT" in
-  *"make deps"*) pass "a missing commitlint points at 'make deps'" ;;
-  *)             fail "a missing commitlint gives no actionable message" ;;
-esac
-
-# The substitutions depend on the exact first-line spelling of two templates.
-# sed exits 0 on a miss, so without verify_line() a reformat would install a
-# silently wrong toolchain and surface much later as "commitlint: not found".
-echo "== a reformatted template must abort the install, not pass silently"
-
-KIT_COPY="$TMP_ROOT/kit-copy"
-mkdir -p "$KIT_COPY"
-tar -c -C "$KIT_DIR" --exclude .git --exclude node_modules . | tar -x -C "$KIT_COPY"
-
-for target in templates/Makefile templates/git-conventions.yaml; do
-  BROKEN="$TMP_ROOT/kit-broken"
-  rm -rf "$BROKEN"
-  cp -R "$KIT_COPY" "$BROKEN"
-  # Squeeze out the spaces the substitution pattern depends on.
-  sed -i.bak '1,6s/ *?= */?=/; 1,6s/^toolchain: /toolchain:/' "$BROKEN/$target"
-  rm -f "$BROKEN/$target.bak"
-
-  R="$(new_repo "drift-$(basename "$target")")"
-  if OUT="$("$BROKEN/install.sh" "$R" --toolchain pixi 2>&1)"; then
-    fail "reformatted $target still exited 0"
-  else
-    case "$OUT" in
-      *"substitution did nothing"*) pass "reformatted $target aborts with a diagnostic" ;;
-      *)                            fail "reformatted $target aborted without naming the cause" ;;
-    esac
-  fi
-done
-
-echo "== commitlint enforces the list in git-conventions.yaml"
-
-FIXTURE_DIR="$TMP_ROOT/fixtures"
-mkdir -p "$FIXTURE_DIR"
-printf 'feat: a real feature\n' > "$FIXTURE_DIR/good"
-printf 'no type here\n'         > "$FIXTURE_DIR/no-type"
-printf 'wip: not an allowed type\n' > "$FIXTURE_DIR/bad-type"
-
-if [ -x "$KIT_DIR/node_modules/.bin/commitlint" ]; then
-  ok "a conventional subject passes"   make -C "$KIT_DIR" commit-lint MSG="$FIXTURE_DIR/good"
-  no "a subject with no type fails"    make -C "$KIT_DIR" commit-lint MSG="$FIXTURE_DIR/no-type"
-  no "a type absent from the yaml fails" make -C "$KIT_DIR" commit-lint MSG="$FIXTURE_DIR/bad-type"
+if git -C "$E2E" commit -q -m "nope, not conventional" >/dev/null 2>&1; then
+  fail "a non-conventional commit message is rejected"
 else
-  echo "  skip commitlint checks (run 'npm install' first)"
+  pass "a non-conventional commit message is rejected"
+fi
+
+if git -C "$E2E" commit -q -m "wip: a type that is not on the list" >/dev/null 2>&1; then
+  fail "a type absent from git-conventions.yaml is rejected"
+else
+  pass "a type absent from git-conventions.yaml is rejected"
+fi
+
+if git -C "$E2E" commit -q -m "feat: a type that is on the list"; then
+  pass "a conventional commit message is accepted"
+else
+  fail "a conventional commit message is accepted"
+fi
+
+# Prove the yaml is the source of truth, not a hardcoded list: add a type and
+# the same message that was just rejected must now pass.
+# Insert into the commit_types block, not at the end of the file (where the
+# last block is comment_labels).
+sed -i.bak 's/^commit_types:$/commit_types:\n  - wip/' "$E2E/.claude/git-conventions.yaml"
+rm -f "$E2E/.claude/git-conventions.yaml.bak"
+echo again > "$E2E/file.txt"
+git -C "$E2E" add -A
+if git -C "$E2E" commit -q -m "wip: now allowed by the yaml"; then
+  pass "adding a type to git-conventions.yaml changes what the hook accepts"
+else
+  fail "adding a type to git-conventions.yaml changes what the hook accepts"
 fi
 
 echo

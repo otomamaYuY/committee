@@ -2,8 +2,6 @@
 # Consumed by: .claude/skills/git-conventions/SKILL.md, commitlint.config.js,
 # and (manually kept in sync — see comment there) .commit-check.yml.
 
-toolchain: npm   # npm | pnpm | yarn | pixi | nix
-
 commit_types:
   - feat
   - fix

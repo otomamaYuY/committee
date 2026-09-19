@@ -38,10 +38,9 @@ function read(rel) { return fs.readFileSync(path.join(ROOT, rel), 'utf8'); }
 // .claude/git-conventions.yaml is deliberately absent: it is the adopter's
 // customization surface, so this repo is free to diverge from the template.
 const PAIRS = [
-  ['Makefile',                             'templates/Makefile'],
   ['commitlint.config.js',                 'templates/commitlint.config.js'],
   ['.commit-check.yml',                    'templates/.commit-check.yml'],
-  ['.husky/commit-msg',                    'templates/husky/commit-msg'],
+  ['.githooks/commit-msg',                  'templates/githooks/commit-msg'],
   ['.github/workflows/commit-check.yml',   'templates/github-workflows/commit-check.yml'],
   ['.claude/skills/git-conventions/SKILL.md', 'skills/git-conventions/SKILL.md'],
 ];
