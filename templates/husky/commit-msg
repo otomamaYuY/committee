@@ -1,0 +1,2 @@
+#!/usr/bin/env bash
+make commit-lint MSG="$1"

@@ -1,0 +1,9 @@
+name: commit-check
+on: [pull_request]
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - uses: commit-check/commit-check-action@v1

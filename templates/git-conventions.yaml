@@ -1,0 +1,39 @@
+# Single source of truth for this repo's git conventions.
+# Consumed by: .claude/skills/git-conventions/SKILL.md, commitlint.config.js,
+# and (manually kept in sync — see comment there) .commit-check.yml.
+
+toolchain: npm   # npm | pnpm | yarn | pixi | nix
+
+commit_types:
+  - feat
+  - fix
+  - docs
+  - style
+  - refactor
+  - perf
+  - test
+  - build
+  - ci
+  - chore
+  - revert
+
+branch_types:
+  - feature
+  - feat
+  - bugfix
+  - fix
+  - hotfix
+  - release
+  - chore
+  - claude   # Conventional Branch AI-agent prefix for Claude Code
+
+comment_labels:
+  - praise
+  - nitpick
+  - suggestion
+  - issue
+  - question
+  - todo
+  - thought
+  - chore
+  - note
