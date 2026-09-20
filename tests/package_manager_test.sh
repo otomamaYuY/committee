@@ -44,20 +44,33 @@ new_repo "$REPO"
 
 # No --frozen-lockfile anywhere: the point is a fresh adopter who has just
 # run install.sh and has no lockfile yet.
-( cd "$REPO" && case "$PM" in
+# Captured rather than discarded: when an install fails, its output is the
+# only thing that says why, and a check that cannot say why is most of the
+# way to no check at all.
+INSTALL_LOG="$TMP_ROOT/install.log"
+
+if ! ( cd "$REPO" && case "$PM" in
     npm)  npm install --no-audit --no-fund ;;
     pnpm) pnpm install ;;
     yarn) yarn install ;;
     yarn-pnp)
       yarn set version berry
+      # Yarn 4 quarantines very recently published versions — its
+      # supply-chain policy, not something this kit is testing. The key is
+      # named differently across 4.x, so try the ones that exist.
       yarn config set nodeLinker pnp
-      # Yarn 4 quarantines very recently published versions. That is its
-      # supply-chain policy, not something this kit is testing.
-      yarn config set npmMinimalAgeGate 0 2>/dev/null || true
+      yarn config set npmMinimalAgeGate 0 2>/dev/null ||
+        yarn config set enableHardenedMode false 2>/dev/null || true
+      echo "yarn is now $(yarn --version)"
       yarn install
       ;;
     *)    echo "unknown package manager: $PM" >&2; exit 2 ;;
-  esac ) >/dev/null 2>&1 || fail "$PM install succeeded"
+  esac ) > "$INSTALL_LOG" 2>&1; then
+  fail "$PM install succeeded"
+  echo "--- $PM install output ---" >&2
+  sed 's/^/    /' "$INSTALL_LOG" >&2
+  echo "--- end ---" >&2
+fi
 
 # PnP deliberately has no node_modules; the hooks branch to `yarn` there,
 # which is the whole point of covering it.
