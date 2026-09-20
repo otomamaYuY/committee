@@ -177,14 +177,21 @@ for (const tpl of walk('templates').sort()) {
 // anything at runtime, so nothing else would catch it.
 console.log('== the docs link to each other and to files that exist');
 
+// docs/ also holds images now, so the pages are the .md entries in it.
+const docPages = fs.readdirSync(path.join(ROOT, 'docs')).filter(f => f.endsWith('.md'));
+
 const MARKDOWN = ['README.md', 'CONTRIBUTING.md', 'CLAUDE.md', 'AGENTS.md', 'SECURITY.md']
-  .concat(fs.readdirSync(path.join(ROOT, 'docs')).map(f => path.join('docs', f)));
+  .concat(docPages.map(f => path.join('docs', f)));
 
 const linked = new Set();
 
 for (const file of MARKDOWN) {
   const text = read(file);
-  for (const m of text.matchAll(/\]\(([^)#][^)]*)\)/g)) {
+  // Markdown links, plus the src of any inline <img> — the README banner is
+  // one, and a moved image file breaks it exactly as silently as a bad link.
+  const targets = [...text.matchAll(/\]\(([^)#][^)]*)\)/g), ...text.matchAll(/src="([^"]+)"/g)];
+
+  for (const m of targets) {
     const target = m[1];
     if (/^[a-z]+:/.test(target)) continue;            // external
     const resolved = path.normalize(path.join(path.dirname(file), target.split('#')[0]));
@@ -194,7 +201,7 @@ for (const file of MARKDOWN) {
   }
 }
 
-for (const doc of fs.readdirSync(path.join(ROOT, 'docs'))) {
+for (const doc of docPages) {
   const rel = path.join('docs', doc);
   if (linked.has(rel)) ok(`${rel} is reachable`);
   else no(`${rel} is reachable`, 'nothing links to it, so nobody will find it');
