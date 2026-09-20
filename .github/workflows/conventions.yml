@@ -31,8 +31,8 @@ jobs:
       # next step with a module-resolution error naming neither the packages
       # nor this kit — the most likely way for an adopter to land here, since
       # install.sh cannot add dependencies to an existing package.json.
-      # `require.resolve` rather than `npx --version`: same answer, ~40ms
-      # instead of ~320ms.
+      # `require.resolve` rather than `npx --version`: same answer without
+      # npx's package-resolution step.
       - name: preflight
         run: |
           if ! node -e 'require.resolve("@commitlint/cli")' >/dev/null 2>&1; then

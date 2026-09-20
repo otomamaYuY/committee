@@ -25,6 +25,29 @@ jobs:
       # because of `sh -c '... "$1" ...'` idioms; those are now behind shared
       # helpers, so the split has nothing left to justify it.
       - name: shellcheck
-        run: shellcheck --severity=info install.sh tests/install_test.sh templates/githooks/*
+        run: shellcheck --severity=info install.sh tests/*.sh templates/githooks/*
       - name: tests
         run: npm test
+
+  # The README claims any package manager that populates node_modules/.bin
+  # works. npm is covered above; this is what lets the claim name the other
+  # two, rather than reasoning about them.
+  package-managers:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        pm: [pnpm, yarn]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+      # corepack ships with Node, so no third-party installer is involved.
+      # Without a packageManager field, `yarn` here is Yarn Classic — which
+      # is the variant the README names.
+      - run: corepack enable
+      - name: ${{ matrix.pm }}
+        env:
+          PM: ${{ matrix.pm }}
+        run: bash tests/package_manager_test.sh "$PM"

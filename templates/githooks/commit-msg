@@ -9,8 +9,9 @@ set -e
 # for --no-verify, which turns the whole enforcement layer off.
 #
 # `require.resolve` walks up parent node_modules exactly as npx does, so it
-# is right in a monorepo too — and it costs ~40ms against npx's ~320ms, on a
-# path git blocks on for every single commit.
+# is right in a monorepo too, and it skips the package-resolution step npx
+# performs — which is most of npx's startup, on a path git blocks on for
+# every single commit.
 if ! node -e 'require.resolve("@commitlint/cli")' >/dev/null 2>&1; then
   echo "commit-msg: commitlint is not installed in this repository." >&2
   echo "            Install the dev dependencies:  npm install" >&2
