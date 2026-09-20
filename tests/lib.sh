@@ -1,4 +1,6 @@
-# Shared assertions for the shell suites. Sourced, never executed.
+# shellcheck shell=bash
+# Shared assertions for the shell suites. Sourced, never executed — hence a
+# shell directive rather than a shebang, which would imply otherwise.
 #
 # This exists because every suite written without it re-invented the same
 # helpers, and three times reached for `sh -c '... "$1" ...' _ "$dir"` to run
