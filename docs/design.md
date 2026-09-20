@@ -161,9 +161,10 @@ through CI, since only the tip of a branch is guaranteed green — `git bisect
 subject is `Merge pull request #17 from owner/branch`, which is not a
 Conventional Commit — this repo would have started violating its own rule at
 the moment it switched. The repository is set to take the pull request title
-as the merge subject instead. That is also the second reason the workflow
-checks that title: it is not a label on a pull request, it is a subject on
-`main`.
+as the merge subject instead — and GitHub appends ` (#19)` to it the same way
+it does for a squash, so the back-reference to the pull request survives.
+That is also the second reason the workflow checks that title: it is not a
+label on a pull request, it is a subject on `main`.
 
 The second place is the ruleset on `main`, which carries its own
 `allowed_merge_methods`. **The effective merge method is the intersection of
