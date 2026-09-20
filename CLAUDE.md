@@ -43,8 +43,8 @@ Before claiming one works, break the thing on purpose and watch it go red.
 
 ## Keep the single source of truth single
 
-`.claude/git-conventions.yaml` is the only place a commit type, branch
-prefix or review label may be written down. The Skill, `AGENTS.md`,
+`.claude/git-conventions.yaml` is the only place a commit type, scope,
+branch prefix or review label may be written down. The Skill, `AGENTS.md`,
 `commitlint.config.js` and `.githooks/pre-push` all read it. If you find
 yourself adding a second list anywhere, that is the bug — the manual-sync
 version of this design is what the kit replaced.
@@ -61,7 +61,7 @@ product-specific environment variable for CI to set.
 ## Do not weaken the enforcement to get a change through
 
 If a hook rejects you, fix the cause. Never `--no-verify`, never edit a hook
-to make your own commit pass. A type you genuinely need goes in
+to make your own commit pass. A type or scope you genuinely need goes in
 `.claude/git-conventions.yaml`.
 
 ## Scope

@@ -16,10 +16,10 @@ explain the conventions and *why* a given type fits a change — the judgment
 a regex cannot make. **Hooks and CI** reject a malformed branch or commit
 regardless of what any agent or human decided.
 
-`.claude/git-conventions.yaml` holds the allowed types, prefixes and labels.
-The Skill, `AGENTS.md`, `commitlint.config.js` and `.githooks/pre-push` all
-read it; none of them restate it. Add a type there and it is allowed
-everywhere at once, locally and in CI.
+`.claude/git-conventions.yaml` holds the allowed types, scopes, prefixes and
+labels. The Skill, `AGENTS.md`, `commitlint.config.js` and
+`.githooks/pre-push` all read it; none of them restate it. Add a type there
+and it is allowed everywhere at once, locally and in CI.
 
 → [Why it is shaped this way](docs/design.md)
 

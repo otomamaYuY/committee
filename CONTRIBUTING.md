@@ -4,7 +4,7 @@ This repo dogfoods its own conventions:
 
 - **Branches**: `feature/…`, `fix/…`, etc. — see [Conventional Branch](https://conventionalbranch.org).
   The `pre-push` hook checks this before anything leaves your machine.
-- **Commits**: Conventional Commits — allowed types are in `.claude/git-conventions.yaml`
+- **Commits**: Conventional Commits — allowed types and scopes are in `.claude/git-conventions.yaml`
 - **PR review comments**: Conventional Comments (`label: subject`)
 
 ## Workflow
@@ -25,8 +25,8 @@ This repo dogfoods its own conventions:
   validation happens before anything is written, existing files in the target
   repo are never overwritten without `--force`, `core.hooksPath` is wired up
   without hijacking a repo that already routes hooks elsewhere, and — end to
-  end, with real `git commit` calls — the type list in `git-conventions.yaml`
-  is what the installed hook actually enforces.
+  end, with real `git commit` calls — the type and scope lists in
+  `git-conventions.yaml` are what the installed hook actually enforces.
 - `tests/drift_test.js` — catches what rots without raising an error: the
   root files this repo dogfoods against their `templates/` counterparts, the
   claim that `.claude/git-conventions.yaml` is the single source of truth
