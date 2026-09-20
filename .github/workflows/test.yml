@@ -90,3 +90,27 @@ jobs:
         env:
           PM: ${{ matrix.pm }}
         run: bash tests/package_manager_test.sh "$PM"
+
+  # Windows was disclaimed as untested. This is the test. windows-latest
+  # provides Git Bash, which is what git itself uses to run hooks there, so
+  # the same suite can drive the same scripts.
+  #
+  # install_test is excluded: it uses `ln -s`, which needs Developer Mode on
+  # Windows. package_manager_test is the one that matters here — it installs
+  # the kit and drives a real commit and push through the installed hooks.
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+      - name: what git is doing to line endings here
+        shell: bash
+        run: |
+          git config --get core.autocrlf || echo "core.autocrlf: unset"
+          file .githooks/commit-msg .githooks/pre-push || true
+      - name: the kit works through Git Bash
+        shell: bash
+        run: bash tests/package_manager_test.sh npm
+
