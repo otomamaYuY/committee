@@ -18,10 +18,26 @@ a real commit and push are driven through the hooks
 `node_modules`, so `require.resolve` from the hook cannot find commitlint.
 Use `nodeLinker: node-modules` if you are on PnP.
 
-Linux and macOS are what CI and development cover. **Windows is untested.**
-The hooks are POSIX `sh`, which git for Windows provides, and the `prepare`
-script goes through node rather than a shell idiom — but nobody has run it
-there, so treat it as unknown rather than working.
+### Platforms
+
+Linux in CI, macOS in development, and **Windows in CI** through Git Bash —
+which is the same interpreter git itself uses to run hooks there, so the
+job exercises the path a Windows user actually takes. It installs the kit,
+installs the dependencies and drives a real commit and a real push through
+the installed hooks.
+
+One thing that job found is worth knowing if you are on Windows. The
+runner has `core.autocrlf=true`, so before `.gitattributes` existed both
+hooks were checked out with CRLF terminators — and they worked, because
+Git Bash tolerates a trailing `\r`. That is the interpreter being
+forgiving rather than the scripts being right: any other `sh` treats the
+`\r` as part of the last argument and fails with an error naming neither
+the line endings nor the hook. `.gitattributes` now pins every shell
+script to LF, and the Windows job asserts it rather than assuming it.
+
+`tests/install_test.sh` is **not** run on Windows: it uses `ln -s`, which
+needs Developer Mode there. So the installer's argument handling and
+no-clobber behaviour are covered on Linux and macOS only.
 
 The whole kit is three dev dependencies: `@commitlint/cli`,
 `@commitlint/config-conventional` and `js-yaml`.
@@ -41,4 +57,5 @@ once `core.hooksPath` is set, and that is the `prepare` script's job.
 | Shell quality | `shellcheck --severity=info`, pinned to 0.11.0 in CI |
 | `npx skills add …` | the skills CLI's published contract — read, not run |
 | Yarn PnP | nothing: stated unsupported and untested |
-| Windows | nothing: stated untested |
+| Windows, through Git Bash | `tests/package_manager_test.sh` on `windows-latest`, plus an assertion that the hooks arrive with LF endings |
+| Windows, `install_test.sh` | nothing: excluded because it uses `ln -s` |
