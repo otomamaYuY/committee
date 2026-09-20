@@ -83,6 +83,14 @@ check_branch() {
 
 hooks_path() { git -C "$1" config --local --get core.hooksPath || true; }
 
+# Exactly what `npm install` would run as prepare, read from the template
+# rather than restated here — a second copy would be free to drift.
+prepare_script() {
+  node -e 'const fs = require("fs");
+           process.stdout.write(JSON.parse(fs.readFileSync(process.argv[1], "utf8")).scripts.prepare)' \
+       "$KIT_DIR/templates/package.json.example"
+}
+
 echo "== argument validation (nothing may be written before the target is validated)"
 
 ok "--help exits 0"                      "$INSTALL" --help
@@ -316,16 +324,17 @@ ok "package.json.example ships a prepare script" \
 ok "package.json.example declares the Node floor commitlint needs" \
    grep -q '">=22' "$KIT_DIR/templates/package.json.example"
 
+PREPARE="$(prepare_script)"
+
 # A prepare script that aborts npm install outside a git repo breaks Docker
 # builds and tarball checkouts, which copy sources without .git.
 NONGIT="$TMP_ROOT/nongit"
 rm -rf "$NONGIT"
 mkdir -p "$NONGIT"
 cp "$KIT_DIR/templates/package.json.example" "$NONGIT/package.json"
-NONGIT_OUT="$(cd "$NONGIT" && sh -c "$(node -e 'const fs=require("fs");process.stdout.write(JSON.parse(fs.readFileSync(process.argv[1],"utf8")).scripts.prepare)' "$KIT_DIR/templates/package.json.example")" 2>&1)"
+NONGIT_OUT="$(in_repo "$NONGIT" sh -c "$PREPARE" 2>&1 || true)"
 ok "the prepare script does not fail outside a git repo" \
-   sh -c 'cd "$1" && sh -c "$2"' _ "$NONGIT" \
-   "$(node -e 'const fs=require("fs");process.stdout.write(JSON.parse(fs.readFileSync(process.argv[1],"utf8")).scripts.prepare)' "$KIT_DIR/templates/package.json.example")"
+   in_repo "$NONGIT" sh -c "$PREPARE"
 has "and says why the hooks are not wired" "$NONGIT_OUT" "not a git repository"
 
 LEAD="$(new_repo lead)"
@@ -344,8 +353,7 @@ ok "a fresh clone starts with no hooksPath (this is why prepare exists)" \
    test -z "$(hooks_path "$MATE")"
 
 # Run exactly what `npm install` would run as prepare.
-PREPARE="$(node -e 'const fs=require("fs");process.stdout.write(JSON.parse(fs.readFileSync(process.argv[1],"utf8")).scripts.prepare)' "$KIT_DIR/templates/package.json.example")"
-(cd "$MATE" && sh -c "$PREPARE")
+in_repo "$MATE" sh -c "$PREPARE"
 ok "the prepare script wires the clone up" test "$(hooks_path "$MATE")" = ".githooks"
 
 ln -s "$KIT_DIR/node_modules" "$MATE/node_modules"
