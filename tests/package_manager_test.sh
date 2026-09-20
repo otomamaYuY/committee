@@ -57,20 +57,26 @@ if ! ( cd "$REPO" && case "$PM" in
       yarn set version berry
       yarn config set nodeLinker pnp
 
-      # Two Yarn 4 supply-chain defaults get in the way here, and neither is
+      # Yarn 4 defaults that get in the way of a scratch repo, none of them
       # anything this kit is testing:
       #
       #   npmMinimalAgeGate quarantines very recently published versions.
       #
-      #   Hardened mode turns itself on for a public pull request and forbids
-      #   an install that would create a lockfile. This repo is scratch and
-      #   has none by design, so the install it forbids is exactly the one
-      #   under test. It is right to default on and right to disable here.
+      #   Hardened mode turns itself on for a public pull request. It warns
+      #   loudly next to the real error below, which is why it looked like
+      #   the cause; it is not.
+      #
+      #   --no-immutable is the one that matters. Yarn makes installs
+      #   immutable whenever CI is set, so it refuses any install that would
+      #   create a lockfile (YN0028). This repo has none by design, so the
+      #   install Yarn refuses is precisely the one under test. That default
+      #   is right for a real project and wrong for this fixture — and it is
+      #   why this passed locally, where CI is unset, and failed here.
       yarn config set npmMinimalAgeGate 0 2>/dev/null || true
       yarn config set enableHardenedMode false 2>/dev/null || true
 
       echo "yarn is now $(yarn --version)"
-      yarn install
+      yarn install --no-immutable
       ;;
     *)    echo "unknown package manager: $PM" >&2; exit 2 ;;
   esac ) > "$INSTALL_LOG" 2>&1; then
