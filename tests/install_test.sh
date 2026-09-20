@@ -313,6 +313,20 @@ echo "== the hooks reach a teammate's clone, not just the installer's machine"
 # so the kit would enforce its conventions for exactly one person.
 ok "package.json.example ships a prepare script" \
    grep -q 'core.hooksPath .githooks' "$KIT_DIR/templates/package.json.example"
+ok "package.json.example declares the Node floor commitlint needs" \
+   grep -q '">=22' "$KIT_DIR/templates/package.json.example"
+
+# A prepare script that aborts npm install outside a git repo breaks Docker
+# builds and tarball checkouts, which copy sources without .git.
+NONGIT="$TMP_ROOT/nongit"
+rm -rf "$NONGIT"
+mkdir -p "$NONGIT"
+cp "$KIT_DIR/templates/package.json.example" "$NONGIT/package.json"
+NONGIT_OUT="$(cd "$NONGIT" && sh -c "$(node -e 'const fs=require("fs");process.stdout.write(JSON.parse(fs.readFileSync(process.argv[1],"utf8")).scripts.prepare)' "$KIT_DIR/templates/package.json.example")" 2>&1)"
+ok "the prepare script does not fail outside a git repo" \
+   sh -c 'cd "$1" && sh -c "$2"' _ "$NONGIT" \
+   "$(node -e 'const fs=require("fs");process.stdout.write(JSON.parse(fs.readFileSync(process.argv[1],"utf8")).scripts.prepare)' "$KIT_DIR/templates/package.json.example")"
+has "and says why the hooks are not wired" "$NONGIT_OUT" "not a git repository"
 
 LEAD="$(new_repo lead)"
 "$INSTALL" "$LEAD" >/dev/null 2>&1

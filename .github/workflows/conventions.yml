@@ -13,11 +13,13 @@ jobs:
   conventions:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with: { fetch-depth: 0 }
-      - uses: actions/setup-node@v4
+      # commitlint 21 requires Node >=22.12; package.json says so too, so a
+      # mismatch here surfaces as an engines warning rather than a crash.
+      - uses: actions/setup-node@v7
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
       # `npm install` rather than `npm ci`: it uses the lockfile when there is
       # one and still works in a repo that has not committed one yet.
