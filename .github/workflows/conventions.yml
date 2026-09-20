@@ -1,5 +1,11 @@
 name: conventions
-on: pull_request
+# `edited` is not in the default set (opened, synchronize, reopened), and
+# without it the pull request title is checked once at open and never again
+# — so retitling after a green run puts an unchecked subject on the default
+# branch, which is precisely the gap the title check exists to close.
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, edited]
 # Both checks only read the history they validate.
 permissions:
   contents: read
