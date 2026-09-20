@@ -3,9 +3,10 @@ The title of this pull request must follow Conventional Commits:
 
     <type>[optional scope]: <description>        e.g. fix(install): stop clobbering the target's Makefile
 
-This is not a formality. Merges here are squashed, so the PR title becomes
-the commit subject on the default branch — it is the one line that survives,
-and CI checks it.
+This is not a formality. This repo merges with a merge commit whose subject
+is the pull request title, so the title lands on the default branch verbatim,
+and CI checks it. The commits on your branch are preserved rather than
+squashed away — write each one as if it will be read alone, because it will.
 
 Allowed types are in .claude/git-conventions.yaml.
 -->
