@@ -1,5 +1,11 @@
 # committee
 
+<p align="center">
+  <img src="docs/images/committee.gif"
+       alt="The word committee, its letters drifting out of alignment and settling back into a single line"
+       width="880">
+</p>
+
 *Where the whole team — human or coding agent — agrees on how to commit,
 branch, version and review.*
 

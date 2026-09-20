@@ -17,3 +17,8 @@ templates/githooks/* text eol=lf
 *.json          text eol=lf
 *.js            text eol=lf
 *.md            text eol=lf
+
+# Binary assets — never line-ending mangled.
+*.gif           binary
+*.png           binary
+*.jpg           binary
