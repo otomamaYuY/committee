@@ -28,6 +28,33 @@ And [Conventional Comments](https://conventionalcomments.org) has no linter
 anywhere. For review comments, the knowledge layer is the only thing there
 is.
 
+Which is to say: a change passes several gates, and every one of them is
+checking the same thing — shape.
+
+```mermaid
+flowchart TD
+  W[write the change] --> K{"knowledge layer<br/>which type and scope<br/>does this change warrant"}
+  K --> C[git commit]
+
+  C --> CM[".githooks/commit-msg<br/>commitlint checks the message shape"]
+  CM -->|rejected| X1["fix the cause<br/>--no-verify is not an option"]
+  CM -->|accepted| P[git push]
+
+  P --> PPH[".githooks/pre-push<br/>checks every ref being pushed"]
+  PPH -->|rejected| X2[fix the branch name]
+  PPH -->|accepted| PR[pull request]
+
+  PR --> CI["CI runs the same hooks<br/>on the same input"]
+  CI --> T["CI also checks the PR title<br/>nothing else looks at it"]
+  T -->|rejected| X3[cannot merge]
+  T -->|accepted| M[merge commit]
+
+  M --> D["on the default branch:<br/>the PR title as the merge subject,<br/>and every commit preserved"]
+
+  N["the gates check shape only<br/>a bug fix mislabelled feat<br/>passes every one of them<br/>only this step stops it"]
+  N -.-> K
+```
+
 ## One file decides everything
 
 `.claude/git-conventions.yaml` holds the allowed commit types, scopes,
@@ -46,6 +73,32 @@ branch prefixes and review labels. Nothing else restates them:
 Add a type there and it is allowed everywhere at once — locally and in CI,
 with no second list to remember and no way for the hook and the pipeline to
 disagree.
+
+Drawn out, with the keys separated from their readers — the point being that
+`comment_labels` is the only one with no path into the enforcement layer at
+all:
+
+```mermaid
+graph LR
+  subgraph SOT[".claude/git-conventions.yaml — the single source of truth"]
+    CT[commit_types]
+    SC[scopes — optional]
+    BT[branch_types]
+    LB[comment_labels]
+  end
+
+  subgraph ENF["enforcement layer — rejects the wrong shape"]
+    CLJS["commitlint.config.js<br/>type-enum / scope-enum"]
+    PP[".githooks/pre-push<br/>branch names"]
+  end
+
+  KN["knowledge layer<br/>SKILL.md / AGENTS.md<br/>reads all four<br/>and explains which to pick"]
+
+  CT --> CLJS
+  SC --> CLJS
+  BT --> PP
+  LB -- "no linter exists for this one" --> KN
+```
 
 ### Why `scopes:` is the one optional list
 
@@ -108,9 +161,10 @@ through CI, since only the tip of a branch is guaranteed green — `git bisect
 subject is `Merge pull request #17 from owner/branch`, which is not a
 Conventional Commit — this repo would have started violating its own rule at
 the moment it switched. The repository is set to take the pull request title
-as the merge subject instead. That is also the second reason the workflow
-checks that title: it is not a label on a pull request, it is a subject on
-`main`.
+as the merge subject instead — and GitHub appends ` (#19)` to it the same way
+it does for a squash, so the back-reference to the pull request survives.
+That is also the second reason the workflow checks that title: it is not a
+label on a pull request, it is a subject on `main`.
 
 The second place is the ruleset on `main`, which carries its own
 `allowed_merge_methods`. **The effective merge method is the intersection of
