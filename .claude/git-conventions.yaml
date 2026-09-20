@@ -1,0 +1,42 @@
+# Single source of truth for this repo's git conventions.
+# Consumed by: .claude/skills/git-conventions/SKILL.md (knowledge),
+# commitlint.config.js (commit messages) and .githooks/pre-push (branch
+# names). All three read this file; none of them restate its contents.
+
+commit_types:
+  - feat
+  - fix
+  - docs
+  - style
+  - refactor
+  - perf
+  - test
+  - build
+  - ci
+  - chore
+  - revert
+
+branch_types:
+  - feature
+  - feat
+  - bugfix
+  - fix
+  - hotfix
+  - release
+  - chore
+  # Conventional Branch's AI-agent prefixes. Keep the branches an agent
+  # opens distinguishable from the ones a person opens — it is the cheapest
+  # signal a reviewer gets about where a change came from.
+  - claude
+  - codex
+
+comment_labels:
+  - praise
+  - nitpick
+  - suggestion
+  - issue
+  - question
+  - todo
+  - thought
+  - chore
+  - note

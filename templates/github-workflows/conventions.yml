@@ -1,0 +1,47 @@
+name: conventions
+on: pull_request
+# Both checks only read the history they validate.
+permissions:
+  contents: read
+jobs:
+  conventions:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - uses: actions/setup-node@v4
+        with: { node-version: 20 }
+      # `npm install` rather than `npm ci`: it uses the lockfile when there is
+      # one and still works in a repo that has not committed one yet.
+      # --ignore-scripts because this job only needs commitlint to run, and a
+      # pull_request build installs dependencies a pull request can change.
+      - run: npm install --no-audit --no-fund --ignore-scripts
+
+      # Without this, a repo that never added the dev dependencies fails the
+      # next step with a module-resolution error naming neither the packages
+      # nor this kit — the most likely way for an adopter to land here, since
+      # install.sh cannot add dependencies to an existing package.json.
+      - name: preflight
+        run: |
+          if ! npx --no -- commitlint --version >/dev/null 2>&1; then
+            echo "::error::commitlint is not installed. Add @commitlint/cli, @commitlint/config-conventional and js-yaml to devDependencies (see package.json.example in the committee kit)."
+            exit 1
+          fi
+
+      # Values from the event go through the environment, never string
+      # interpolation into the shell — the habit that keeps a workflow from
+      # becoming a script-injection sink when a field is attacker-controlled.
+      - name: commit messages
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: npx --no -- commitlint --from "$BASE_SHA" --to "$HEAD_SHA" --verbose
+
+      # The same hook developers run locally, so CI cannot disagree with it.
+      # This deliberately runs the hook from the PR's own checkout: a PR that
+      # fixes the hook has to be testable. The job holds only contents: read
+      # and no secrets, so what a PR can reach here it could reach anyway.
+      - name: branch name
+        env:
+          COMMITTEE_BRANCH: ${{ github.head_ref }}
+        run: ./.githooks/pre-push

@@ -1,0 +1,19 @@
+#!/bin/sh
+# Rejects a commit message that does not follow Conventional Commits.
+# Installed by committee. The allowed types live in
+# .claude/git-conventions.yaml, which commitlint.config.js reads directly.
+set -e
+
+# `npx --no` deliberately refuses to fetch on demand: a hook that silently
+# downloads a linter mid-commit is worse than one that fails. Say what is
+# missing and how to fix it, because a developer whose every commit is
+# rejected by an unexplained error reaches for --no-verify, which turns the
+# whole enforcement layer off.
+if ! npx --no -- commitlint --version >/dev/null 2>&1; then
+  echo "commit-msg: commitlint is not installed in this repository." >&2
+  echo "            Install the dev dependencies:  npm install" >&2
+  echo "            (pnpm install / yarn install work the same way.)" >&2
+  exit 1
+fi
+
+exec npx --no -- commitlint --edit "$1"

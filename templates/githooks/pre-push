@@ -1,0 +1,87 @@
+#!/bin/sh
+# Rejects pushing a branch whose name does not follow Conventional Branch.
+# Installed by committee. The allowed prefixes live in
+# .claude/git-conventions.yaml — this hook reads them, it does not restate
+# them, so there is no second list to keep in sync.
+set -e
+
+CONFIG=".claude/git-conventions.yaml"
+
+# CI checks out a detached merge ref, so the branch under test is passed in
+# rather than read from HEAD.
+branch="${COMMITTEE_BRANCH:-$(git symbolic-ref --short HEAD 2>/dev/null || true)}"
+
+# No branch name to judge: a detached HEAD from a rebase, a bisect or a
+# tag push. Not this hook's business.
+[ -n "$branch" ] || exit 0
+
+case "$branch" in
+  main|master|develop) exit 0 ;;
+esac
+
+# Fail closed where this hook is the gate and open where it is a
+# convenience. Locally, a missing config should not block someone mid-rebase
+# in a worktree; in CI it is the ONLY branch-name check, so skipping it there
+# would silently remove the control for every branch, with nothing but a
+# stderr line to say so.
+strict() { [ -n "${CI:-}" ] || [ -n "${COMMITTEE_BRANCH:-}" ]; }
+
+give_up() {
+  echo "pre-push: $1" >&2
+  if strict; then
+    echo "          Refusing to skip the branch-name check in CI." >&2
+    exit 1
+  fi
+  echo "          Skipping the branch-name check." >&2
+  exit 0
+}
+
+if [ ! -f "$CONFIG" ]; then
+  give_up "$CONFIG not found."
+fi
+
+# Read the branch_types block without a YAML parser: this hook has to work in
+# a fresh clone, before anything has been installed. The range ends at the
+# next line that starts a new top-level key.
+types=$(
+  sed -n '/^branch_types:/,/^[^ #-]/p' "$CONFIG" |
+  sed -n 's/^[[:space:]]*-[[:space:]]*\([a-z][a-z0-9-]*\).*/\1/p'
+)
+
+if [ -z "$types" ]; then
+  give_up "no branch_types could be read from $CONFIG (is it a block sequence of plain strings?)."
+fi
+
+reject() {
+  echo "pre-push: branch name '$branch' does not follow Conventional Branch." >&2
+  echo >&2
+  echo "  Expected <type>/<description>, lowercase and hyphen-separated," >&2
+  echo "  for example: feature/add-oauth-login" >&2
+  echo >&2
+  echo "  Allowed types (from $CONFIG):" >&2
+  echo "$types" | sed 's/^/    /' >&2
+  echo >&2
+  echo "  Rename it:  git branch -m <new-name>" >&2
+  exit 1
+}
+
+case "$branch" in
+  */*) ;;
+  *) reject ;;
+esac
+
+prefix="${branch%%/*}"
+rest="${branch#*/}"
+
+matched=no
+for t in $types; do
+  if [ "$t" = "$prefix" ]; then
+    matched=yes
+    break
+  fi
+done
+[ "$matched" = yes ] || reject
+
+# Lowercase alphanumeric words separated by single hyphens. Rejects capitals,
+# a trailing or doubled hyphen, and an empty description.
+printf '%s' "$rest" | grep -qE '^[a-z0-9]+(-[a-z0-9]+)*$' || reject

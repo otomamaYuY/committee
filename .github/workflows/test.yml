@@ -1,0 +1,38 @@
+# This workflow tests the kit itself and is deliberately NOT mirrored under
+# templates/ — adopting repos receive conventions.yml only.
+# tests/drift_test.js knows about that asymmetry.
+name: test
+on:
+  pull_request:
+  push:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      # Two bars, because the two groups carry different risk.
+      #
+      # install.sh and the hooks run in other people's repositories, and
+      # install.sh runs rm -rf against a path its caller supplied. They are
+      # held to info, the level where SC2086 (unquoted expansion) actually
+      # reports — warning is too coarse to catch it. Both are clean there.
+      - name: shellcheck (shipped artifacts)
+        run: shellcheck --severity=info install.sh templates/githooks/*
+
+      # The harness only ever runs in this repo. It sits at warning because
+      # two of its deliberate idioms report at info: `sh -c '... "$1" ...' _ "$v"`
+      # is SC2016 (the single quotes are the point — $1 is sh -c's positional
+      # parameter, not an expansion), and `cd X && cmd || true` is SC2015
+      # (C running when A succeeds is exactly the intent).
+      - name: shellcheck (test harness)
+        run: shellcheck --severity=warning tests/install_test.sh
+      - name: tests
+        run: npm test
