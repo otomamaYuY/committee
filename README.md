@@ -61,6 +61,15 @@ disagree.
 npx skills add otomamaYuY/committee --skill git-conventions
 ```
 
+Through the [skills](https://github.com/vercel-labs/skills) CLI, whose
+documented discovery covers this repo's `skills/<name>/SKILL.md` layout and
+which installs to `.claude/skills/` for Claude Code. That is checked against
+the CLI's documentation, not by running it here — if it does not work for
+you, please open an issue.
+
+This path gives you the knowledge layer only. Nothing stops an agent that
+ignores it; for that, install the whole kit.
+
 ### The whole kit
 
 ```bash
@@ -118,10 +127,21 @@ re-implementation of it, so the two cannot drift apart.
 
 **Node 22.12 or newer** — commitlint 21 requires it, and `package.json`
 declares it — and a package manager that populates `node_modules/.bin`,
-which is where the hooks resolve `commitlint` from. npm is what the test suite exercises; pnpm
-and Yarn Classic work by the same mechanism. **Yarn PnP does not**, because
-it deliberately has no `node_modules`; use `nodeLinker: node-modules`, or
-call commitlint through `yarn commitlint` in your own hook.
+which is where the hooks resolve `commitlint` from.
+
+npm, pnpm and Yarn Classic are each exercised by CI: the kit is installed
+into a scratch repo, the dependencies are installed with that manager, and
+a real commit and push are driven through the hooks
+(`tests/package_manager_test.sh`).
+
+**Yarn PnP is not supported and not tested** — it deliberately has no
+`node_modules`, so `require.resolve` from the hook cannot find commitlint.
+Use `nodeLinker: node-modules` if you are on PnP.
+
+Linux and macOS are what CI and development cover. **Windows is untested.**
+The hooks are POSIX `sh`, which git for Windows provides, and the `prepare`
+script goes through node rather than a shell idiom — but nobody has run it
+there, so treat it as unknown rather than working.
 
 The whole kit is three dev dependencies: `@commitlint/cli`,
 `@commitlint/config-conventional` and `js-yaml`.
@@ -134,9 +154,9 @@ once `core.hooksPath` is set, and that is the `prepare` script's job.
 
 - **It does not automate releases.** SemVer is explained to the agent, not
   automated by a pipeline. Adding `semantic-release` yourself is a handful
-  of lines; having it in every adopting repo cost 502 of 565 transitive
-  dependencies and shipped a workflow holding a `contents: write` token,
-  which is a poor default for a conventions kit.
+  of lines; having it in every adopting repo meant ~480 transitive
+  dependencies against this kit's 95, and a workflow holding a
+  `contents: write` token — a poor default for a conventions kit.
 - **It does not enforce Conventional Comments.** No linter for it exists.
   The knowledge layer is the whole story there.
 - **It does not manage your Node environment.** If you use pixi, nix or

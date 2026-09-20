@@ -19,22 +19,13 @@ set -u
 KIT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 INSTALL="$KIT_DIR/install.sh"
 
+# shellcheck source=tests/lib.sh
+. "$KIT_DIR/tests/lib.sh"
+
 TMP_ROOT="$(mktemp -d)"
 trap 'rm -rf "$TMP_ROOT"' EXIT
 
-PASSED=0
-FAILED=0
-
-pass() { PASSED=$((PASSED + 1)); printf '  ok   %s\n' "$1"; }
-fail() { FAILED=$((FAILED + 1)); printf '  FAIL %s\n' "$1"; }
-
-# ok <description> <command...> — expects the command to succeed.
-ok() { desc="$1"; shift; if "$@" >/dev/null 2>&1; then pass "$desc"; else fail "$desc"; fi; }
-# no <description> <command...> — expects the command to fail.
-no() { desc="$1"; shift; if "$@" >/dev/null 2>&1; then fail "$desc"; else pass "$desc"; fi; }
-# has <description> <haystack> <needle>
-has() { case "$2" in *"$3"*) pass "$1" ;; *) fail "$1" ;; esac; }
-
+# The suites differ here: this one names repos and wants the path back.
 new_repo() {
   _dir="$TMP_ROOT/$1"
   rm -rf "$_dir"
@@ -57,15 +48,6 @@ installed_repo() {
   printf '%s' "$_dir"
 }
 
-# git runs hooks with the repo root as cwd, and node resolves node_modules
-# from there — running one from anywhere else would search the wrong tree.
-# </dev/null matters too: pre-push reads its refs from stdin.
-in_repo() {
-  _d="$1"
-  shift
-  (cd "$_d" && "$@" </dev/null)
-}
-
 ZERO_SHA=0000000000000000000000000000000000000000
 SOME_SHA=1111111111111111111111111111111111111111
 
@@ -80,8 +62,6 @@ push_refs() {
 check_branch() {
   push_refs "$1" "refs/heads/$2 $SOME_SHA refs/heads/$2 $ZERO_SHA"
 }
-
-hooks_path() { git -C "$1" config --local --get core.hooksPath || true; }
 
 # Exactly what `npm install` would run as prepare, read from the template
 # rather than restated here — a second copy would be free to drift.
@@ -437,6 +417,4 @@ NAMED="$(new_repo my-service)"
 ok "the placeholder name is substituted" grep -q '"name": "my-service"' "$NAMED/package.json"
 no "no placeholder survives"             grep -q 'your-project' "$NAMED/package.json"
 
-echo
-echo "install_test: $PASSED passed, $FAILED failed"
-[ "$FAILED" -eq 0 ]
+summary install_test

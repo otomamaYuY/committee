@@ -38,10 +38,20 @@ Both failure modes are quiet in production — a stale `templates/` copy still
 leaves CI green here while shipping the unfixed file to every adopting repo —
 so please add a case rather than only fixing the symptom.
 
+A third suite, `tests/package_manager_test.sh`, is not in `npm test`: it
+installs the kit into a scratch repo, installs the dependencies with one
+package manager, and drives a real commit and push through the hooks. Run it
+for npm locally; CI runs it for pnpm and Yarn Classic, which is what lets the
+README name those two instead of reasoning about them.
+
+```bash
+bash tests/package_manager_test.sh npm
+```
+
 If you touch a shell file, run what CI runs:
 
 ```bash
-shellcheck --severity=info install.sh tests/install_test.sh templates/githooks/*
+shellcheck --severity=info install.sh tests/*.sh templates/githooks/*
 ```
 
 `info` rather than `warning`, because SC2086 — an unquoted expansion —
