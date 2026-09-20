@@ -104,20 +104,31 @@ thing being bought.
 through CI, since only the tip of a branch is guaranteed green — `git bisect
 --first-parent` walks the merges instead when that bites.
 
-**One setting had to change first.** GitHub's default merge commit subject is
-`Merge pull request #17 from owner/branch`, which is not a Conventional
-Commit — this repo would have started violating its own rule at the moment it
-switched. The repository is set to take the pull request title as the merge
-subject instead. That is also the second reason the workflow checks that
-title: it is not a label on a pull request, it is a subject on `main`.
+**Settings had to change first, in two places.** GitHub's default merge commit
+subject is `Merge pull request #17 from owner/branch`, which is not a
+Conventional Commit — this repo would have started violating its own rule at
+the moment it switched. The repository is set to take the pull request title
+as the merge subject instead. That is also the second reason the workflow
+checks that title: it is not a label on a pull request, it is a subject on
+`main`.
+
+The second place is the ruleset on `main`, which carries its own
+`allowed_merge_methods`. **The effective merge method is the intersection of
+the two**, so changing one alone does not switch strategies — it removes
+every option and nothing can be merged at all. That is not hypothetical:
+this repo's own switch was made by changing the repository setting first, and
+the next pull request could not be merged by any method until the ruleset
+caught up. If you are copying this decision, change both, and change the
+ruleset first.
 
 **There is no test for any of this, and there cannot usefully be one.** The
-subject is a GitHub repository setting; nothing in this repo can observe it
-without a token and a network call. The one cheap guard — a job on `push:
-main` running commitlint over the new subject — would fire after the bad
-commit is already on `main`, and only repeats what the pull request title
-check already established before the merge. The real guard for a setting is a
-GitHub ruleset, not a file here.
+subject is a GitHub setting; nothing in this repo can observe it without a
+token and a network call. The one cheap guard — a job on `push: main` running
+commitlint over the new subject — would fire after the bad commit is already
+on `main`, and only repeats what the pull request title check already
+established before the merge. The real guard for a setting is the ruleset,
+which is also where the allowed merge methods are pinned, and which no file
+in this repository can enforce on its own behalf.
 
 **None of this is shipped.** The kit takes no position on an adopting repo's
 merge strategy, and the workflow it installs says so: the pull request title
