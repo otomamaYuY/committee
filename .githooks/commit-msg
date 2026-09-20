@@ -4,6 +4,15 @@
 # .claude/git-conventions.yaml, which commitlint.config.js reads directly.
 set -e
 
+# Yarn PnP has no node_modules by design, so neither `npx` nor a bare
+# `require.resolve` can find anything — but `yarn` itself injects the PnP
+# runtime and resolves fine. Without this branch the hook reports commitlint
+# as missing to someone who has already installed it, and tells them to run
+# the install they just ran.
+if [ -f .pnp.cjs ]; then
+  exec yarn commitlint --edit "$1"
+fi
+
 # Say what is missing rather than letting npx fail in its own words: a
 # developer whose every commit is rejected by an unexplained error reaches
 # for --no-verify, which turns the whole enforcement layer off.

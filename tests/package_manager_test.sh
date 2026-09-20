@@ -4,7 +4,7 @@
 # installing the dev dependencies with the manager under test, and driving a
 # real commit and a real push through the installed hooks.
 #
-# Usage: package_manager_test.sh [npm|pnpm|yarn]
+# Usage: package_manager_test.sh [npm|pnpm|yarn|yarn-pnp]
 #
 # npm runs locally; pnpm and yarn run in CI, where corepack provides them.
 # The claim is only worth making for managers this has actually exercised.
@@ -12,6 +12,13 @@
 set -u
 
 PM="${1:-npm}"
+
+# yarn-pnp is yarn with node_modules switched off — a different install
+# shape, not a different manager, so the binary to probe for is still yarn.
+case "$PM" in
+  yarn-pnp) PM_BIN=yarn ;;
+  *)        PM_BIN="$PM" ;;
+esac
 KIT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 # shellcheck source=tests/lib.sh
@@ -20,12 +27,12 @@ KIT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 TMP_ROOT="$(mktemp -d)"
 trap 'rm -rf "$TMP_ROOT"' EXIT
 
-command -v "$PM" >/dev/null 2>&1 || {
-  echo "package_manager_test: $PM is not installed — nothing verified" >&2
+command -v "$PM_BIN" >/dev/null 2>&1 || {
+  echo "package_manager_test: $PM_BIN is not installed — nothing verified" >&2
   exit 127
 }
 
-echo "== $PM: $("$PM" --version 2>/dev/null)"
+echo "== $PM: $("$PM_BIN" --version 2>/dev/null)"
 
 REPO="$TMP_ROOT/repo"
 new_repo "$REPO"
@@ -41,13 +48,29 @@ new_repo "$REPO"
     npm)  npm install --no-audit --no-fund ;;
     pnpm) pnpm install ;;
     yarn) yarn install ;;
+    yarn-pnp)
+      yarn set version berry
+      yarn config set nodeLinker pnp
+      # Yarn 4 quarantines very recently published versions. That is its
+      # supply-chain policy, not something this kit is testing.
+      yarn config set npmMinimalAgeGate 0 2>/dev/null || true
+      yarn install
+      ;;
     *)    echo "unknown package manager: $PM" >&2; exit 2 ;;
   esac ) >/dev/null 2>&1 || fail "$PM install succeeded"
 
-# This is the mechanism the README names, and what both hooks depend on.
-ok "$PM populates node_modules/.bin/commitlint" test -x "$REPO/node_modules/.bin/commitlint"
-ok "the hook's own resolution finds commitlint" \
-   in_repo "$REPO" node -e 'require.resolve("@commitlint/cli")'
+# PnP deliberately has no node_modules; the hooks branch to `yarn` there,
+# which is the whole point of covering it.
+if [ "$PM" = yarn-pnp ]; then
+  ok "PnP produced a .pnp.cjs" test -f "$REPO/.pnp.cjs"
+  no "PnP produced no node_modules" test -d "$REPO/node_modules"
+  ok "yarn resolves commitlint under PnP" \
+     in_repo "$REPO" yarn commitlint --version
+else
+  ok "$PM populates node_modules/.bin/commitlint" test -x "$REPO/node_modules/.bin/commitlint"
+  ok "the hook's own resolution finds commitlint" \
+     in_repo "$REPO" node -e 'require.resolve("@commitlint/cli")'
+fi
 
 # prepare runs on install for all three managers; without it the hooks are
 # inert no matter which one was used.

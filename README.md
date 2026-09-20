@@ -86,9 +86,8 @@ cannot drift apart.
 
 ## Requirements
 
-**Node 22.12 or newer**, and a package manager that populates
-`node_modules/.bin` — npm, pnpm and Yarn Classic are each exercised by CI,
-on Linux and on Windows through Git Bash. Yarn PnP is not supported.
+**Node 22.12 or newer**. npm, pnpm, Yarn Classic and Yarn PnP are each
+exercised by CI, on Linux and on Windows through Git Bash.
 
 → [What is verified, and what is not](docs/compatibility.md)
 

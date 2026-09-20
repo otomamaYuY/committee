@@ -15,14 +15,22 @@ missing_deps() {
   exit 1
 }
 
-command -v node >/dev/null 2>&1 || missing_deps "node is not on PATH."
+# Yarn PnP has no node_modules, so plain `node` cannot resolve js-yaml;
+# `yarn node` injects the PnP runtime and can. Everything else about this
+# hook is identical either way.
+if [ -f .pnp.cjs ]; then
+  NODE="yarn node"
+else
+  NODE="node"
+  command -v node >/dev/null 2>&1 || missing_deps "node is not on PATH."
+fi
 
 # Read the list with the same parser the rest of the kit uses. Doing this in
 # sh would mean a second, weaker YAML implementation — and it would buy
 # nothing: git only calls a hook once core.hooksPath is set, which happens in
 # package.json's prepare script, so by the time this can run at all,
 # `npm install` has already provided node and js-yaml.
-types=$(node -e '
+types=$($NODE -e '
   const fs = require("fs");
   let yaml;
   try {

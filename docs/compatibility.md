@@ -14,9 +14,14 @@ into a scratch repo, the dependencies are installed with that manager, and
 a real commit and push are driven through the hooks
 (`tests/package_manager_test.sh`).
 
-**Yarn PnP is not supported and not tested** — it deliberately has no
-`node_modules`, so `require.resolve` from the hook cannot find commitlint.
-Use `nodeLinker: node-modules` if you are on PnP.
+**Yarn PnP works.** It deliberately has no `node_modules`, so neither
+`npx` nor a bare `require.resolve` finds anything — but `yarn` injects the
+PnP runtime and resolves fine, so both hooks take that route when they see
+a `.pnp.cjs`. Nothing to configure.
+
+This was documented as unsupported before anyone tried it. What a PnP user
+actually got was worse than unsupported: the commit was blocked, correctly,
+with a message telling them to run the install they had just run.
 
 ### Platforms
 
@@ -56,6 +61,6 @@ once `core.hooksPath` is set, and that is the `prepare` script's job.
 | Node floor | `engines` in `package.json`, and CI runs Node 22 |
 | Shell quality | `shellcheck --severity=info`, pinned to 0.11.0 in CI |
 | `npx skills add …` | the skills CLI's published contract — read, not run |
-| Yarn PnP | nothing: stated unsupported and untested |
+| Yarn PnP | `tests/package_manager_test.sh yarn-pnp`, in the CI matrix |
 | Windows, through Git Bash | `tests/package_manager_test.sh` on `windows-latest`, plus an assertion that the hooks arrive with LF endings |
 | Windows, `install_test.sh` | nothing: excluded because it uses `ln -s` |
