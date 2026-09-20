@@ -85,11 +85,14 @@ away.
 **For everyone else, `npm install` is what activates them.** `core.hooksPath`
 lives in `.git/config`, which is never committed, so a teammate's fresh clone
 has the hook *files* but nothing running them. The `prepare` script in
-`package.json` — `git config --local core.hooksPath .githooks` — runs on
-their first install and wires it up. It is husky's one-line idiom without
-the dependency. If your repo already had a `package.json`, the installer
-tells you to add that script yourself; skip it and the hooks silently run
-for exactly one person on the team.
+`package.json` runs `git config --local core.hooksPath .githooks` on their
+first install and wires it up — husky's idiom without the dependency. It
+goes through `node` so that a checkout without a `.git` directory, such as a
+Docker build, gets a warning instead of a failed install.
+
+If your repo already had a `package.json`, the installer tells you to add
+that script yourself. Skip it and the hooks run for exactly one person on
+the team, silently.
 
 The target must already exist and be a git repository; the hooks and the
 workflow do nothing outside one.
@@ -116,12 +119,18 @@ commitlint.config.js
 .githooks/
   commit-msg                        # Conventional Commits, every commit
   pre-push                          # Conventional Branch, every push
-.github/workflows/conventions.yml   # both checks again, on every PR
+.github/workflows/conventions.yml   # all three again, on every PR
 package.json                        # three dev dependencies
 ```
 
-CI runs the *same* `pre-push` script developers run locally, rather than a
-re-implementation of it, so the two cannot drift apart.
+On a pull request CI checks the commit messages, the branch name, and the
+**pull request title** — which matters more than it sounds: a squash merge
+puts the PR title on your default branch and discards the commits, so on a
+squash workflow it is the only subject that survives.
+
+The branch check is the *same* `pre-push` script developers run locally,
+driven through git's own protocol rather than re-implemented, so the two
+cannot drift apart.
 
 ## Requirements
 
@@ -169,13 +178,12 @@ Scaffolded with its own `install.sh`. The root `.claude/`, `.githooks/`,
 `tests/drift_test.js` fails if any of them drifts from `templates/`, so the
 example cannot quietly stop matching what you would install.
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for the test suites.
-
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md). `main` is protected: changes go
-through a pull request, and the `conventions` and `test` checks must pass.
-Report security issues privately — see [SECURITY.md](SECURITY.md).
+[CONTRIBUTING.md](CONTRIBUTING.md) covers the test suites and how to run
+what CI runs. `main` is protected: changes go through a pull request, and
+the `conventions` and `test` checks must pass. Report security issues
+privately — see [SECURITY.md](SECURITY.md).
 
 ## License
 
