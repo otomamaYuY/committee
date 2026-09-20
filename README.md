@@ -125,8 +125,9 @@ call commitlint through `yarn commitlint` in your own hook.
 The whole kit is three dev dependencies: `@commitlint/cli`,
 `@commitlint/config-conventional` and `js-yaml`.
 
-The `pre-push` hook parses the YAML with `sed`, so branch checking works in
-a fresh clone before anything has been installed.
+Both hooks need those packages, and both say so plainly when they are
+missing. They never run before `npm install` anyway: git only calls a hook
+once `core.hooksPath` is set, and that is the `prepare` script's job.
 
 ## What this kit does not do
 

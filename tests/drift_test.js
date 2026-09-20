@@ -88,8 +88,8 @@ if (!Array.isArray(typeEnum)) {
      `yaml:       ${conventions.commit_types.join(', ')}\n       commitlint: ${typeEnum.join(', ')}`);
 }
 
-// The pre-push hook must read the yaml rather than restate it — the manual
-// sync this replaced was a standing source of local/CI disagreement.
+// The pre-push hook must read the yaml rather than restate it — a second
+// copy of the list is how the local hook and CI start disagreeing.
 const prePush = read('.githooks/pre-push');
 if (prePush.includes('git-conventions.yaml')) ok('pre-push reads the conventions file');
 else no('pre-push reads the conventions file', 'it appears to hardcode its own list');

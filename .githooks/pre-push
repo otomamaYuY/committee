@@ -7,81 +7,102 @@ set -e
 
 CONFIG=".claude/git-conventions.yaml"
 
-# CI checks out a detached merge ref, so the branch under test is passed in
-# rather than read from HEAD.
-branch="${COMMITTEE_BRANCH:-$(git symbolic-ref --short HEAD 2>/dev/null || true)}"
-
-# No branch name to judge: a detached HEAD from a rebase, a bisect or a
-# tag push. Not this hook's business.
-[ -n "$branch" ] || exit 0
-
-case "$branch" in
-  main|master|develop) exit 0 ;;
-esac
-
-# Fail closed where this hook is the gate and open where it is a
-# convenience. Locally, a missing config should not block someone mid-rebase
-# in a worktree; in CI it is the ONLY branch-name check, so skipping it there
-# would silently remove the control for every branch, with nothing but a
-# stderr line to say so.
-strict() { [ -n "${CI:-}" ] || [ -n "${COMMITTEE_BRANCH:-}" ]; }
-
-give_up() {
+missing_deps() {
   echo "pre-push: $1" >&2
-  if strict; then
-    echo "          Refusing to skip the branch-name check in CI." >&2
-    exit 1
-  fi
-  echo "          Skipping the branch-name check." >&2
-  exit 0
-}
-
-if [ ! -f "$CONFIG" ]; then
-  give_up "$CONFIG not found."
-fi
-
-# Read the branch_types block without a YAML parser: this hook has to work in
-# a fresh clone, before anything has been installed. The range ends at the
-# next line that starts a new top-level key.
-types=$(
-  sed -n '/^branch_types:/,/^[^ #-]/p' "$CONFIG" |
-  sed -n 's/^[[:space:]]*-[[:space:]]*\([a-z][a-z0-9-]*\).*/\1/p'
-)
-
-if [ -z "$types" ]; then
-  give_up "no branch_types could be read from $CONFIG (is it a block sequence of plain strings?)."
-fi
-
-reject() {
-  echo "pre-push: branch name '$branch' does not follow Conventional Branch." >&2
   echo >&2
-  echo "  Expected <type>/<description>, lowercase and hyphen-separated," >&2
-  echo "  for example: feature/add-oauth-login" >&2
-  echo >&2
-  echo "  Allowed types (from $CONFIG):" >&2
-  echo "$types" | sed 's/^/    /' >&2
-  echo >&2
-  echo "  Rename it:  git branch -m <new-name>" >&2
+  echo "          Install the dev dependencies:  npm install" >&2
+  echo "          (pnpm install / yarn install work the same way.)" >&2
   exit 1
 }
 
-case "$branch" in
-  */*) ;;
-  *) reject ;;
-esac
+command -v node >/dev/null 2>&1 || missing_deps "node is not on PATH."
 
-prefix="${branch%%/*}"
-rest="${branch#*/}"
+# Read the list with the same parser the rest of the kit uses. Doing this in
+# sh would mean a second, weaker YAML implementation — and it would buy
+# nothing: git only calls a hook once core.hooksPath is set, which happens in
+# package.json's prepare script, so by the time this can run at all,
+# `npm install` has already provided node and js-yaml.
+types=$(node -e '
+  const fs = require("fs");
+  let yaml;
+  try {
+    yaml = require("js-yaml");
+  } catch (e) {
+    console.error("js-yaml is not installed");
+    process.exit(1);
+  }
+  const config = yaml.load(fs.readFileSync(process.argv[1], "utf8"));
+  const types = config && config.branch_types;
+  if (!Array.isArray(types) || types.length === 0) {
+    console.error("no non-empty \"branch_types:\" list found");
+    process.exit(1);
+  }
+  process.stdout.write(types.join("\n"));
+' "$CONFIG" 2>&1) || missing_deps "could not read branch types from $CONFIG — $types"
 
-matched=no
-for t in $types; do
-  if [ "$t" = "$prefix" ]; then
-    matched=yes
-    break
+reject() {
+  cat >&2 <<EOF
+pre-push: branch name '$1' does not follow Conventional Branch.
+
+  Expected <type>/<description>, lowercase and hyphen-separated,
+  for example: feature/add-oauth-login
+
+  Allowed types (from $CONFIG):
+$(echo "$types" | sed 's/^/    /')
+
+  Rename it:  git branch -m <new-name>
+EOF
+  exit 1
+}
+
+check() {
+  _branch="$1"
+  case "$_branch" in
+    main|master|develop) return 0 ;;
+    */*) ;;
+    *) reject "$_branch" ;;
+  esac
+
+  echo "$types" | grep -qxF "${_branch%%/*}" || reject "$_branch"
+
+  # Lowercase alphanumeric words separated by single hyphens. Rejects
+  # capitals, a trailing or doubled hyphen, and an empty description.
+  printf '%s' "${_branch#*/}" | grep -qE '^[a-z0-9]+(-[a-z0-9]+)*$' || reject "$_branch"
+}
+
+# git feeds the hook one line per ref being pushed:
+#   <local ref> <local sha> <remote ref> <remote sha>
+# Judging those rather than HEAD is what makes `git push origin a b` and
+# `git push --all` check every branch actually leaving the machine, not just
+# whichever one happens to be checked out.
+if [ -t 0 ]; then
+  refs=""
+else
+  refs=$(cat)
+fi
+
+if [ -n "$refs" ]; then
+  # The loop body runs in a subshell because of the pipe, so `reject`'s exit
+  # ends that subshell rather than this script. Its status still becomes the
+  # pipeline's, which `set -e` would act on — `|| exit 1` says so outright
+  # instead of resting on that. (Removing it changes no test: the refusal
+  # propagates either way. It is here so a later `set +e` or a restructure
+  # cannot quietly turn a rejected branch into an accepted one.)
+  echo "$refs" | while read -r local_ref local_sha _remote_ref _remote_sha; do
+    # A deletion pushes the all-zero sha and has no name to judge.
+    case "$local_sha" in *[!0]*) ;; *) continue ;; esac
+    case "$local_ref" in
+      refs/heads/*) check "${local_ref#refs/heads/}" ;;
+      *) ;;  # a tag or a note: not a branch name
+    esac
+  done || exit 1
+else
+  # Run directly rather than by git — CI, or a person checking by hand.
+  # A detached HEAD (a rebase, a bisect) has no branch name to judge, and
+  # must not fail: `[ -n "$b" ] && check "$b"` would make the empty case the
+  # script's exit status.
+  branch=$(git symbolic-ref --short HEAD 2>/dev/null || true)
+  if [ -n "$branch" ]; then
+    check "$branch"
   fi
-done
-[ "$matched" = yes ] || reject
-
-# Lowercase alphanumeric words separated by single hyphens. Rejects capitals,
-# a trailing or doubled hyphen, and an empty description.
-printf '%s' "$rest" | grep -qE '^[a-z0-9]+(-[a-z0-9]+)*$' || reject
+fi

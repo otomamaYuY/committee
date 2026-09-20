@@ -36,18 +36,15 @@ Both failure modes are quiet in production — a stale `templates/` copy still
 leaves CI green here while shipping the unfixed file to every adopting repo —
 so please add a case rather than only fixing the symptom.
 
-If you touch a shell file, run what CI runs — two bars, because the shipped
-artifacts carry more risk than the harness:
+If you touch a shell file, run what CI runs:
 
 ```bash
-shellcheck --severity=info install.sh templates/githooks/*
-shellcheck --severity=warning tests/install_test.sh
+shellcheck --severity=info install.sh tests/install_test.sh templates/githooks/*
 ```
 
-`install.sh` and the hooks land in other people's repositories, so they are
-held to `info`, where SC2086 (unquoted expansion) reports. The harness stays
-at `warning` because two of its deliberate idioms — `sh -c '... "$1" ...'`
-and `cmd || true` — are flagged at `info` by design.
+`info` rather than `warning`, because SC2086 — an unquoted expansion —
+reports at `info`, and `install.sh` runs `rm -rf` against a path its caller
+supplied.
 
 ## The duplication is deliberate
 

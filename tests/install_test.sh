@@ -45,15 +45,49 @@ new_repo() {
   printf '%s' "$_dir"
 }
 
+# A repo with the kit already installed. `--with-deps` borrows the kit's own
+# node_modules so the hooks can actually run, which exercises the installed
+# hook rather than npm.
+installed_repo() {
+  _dir="$(new_repo "$1")"
+  "$INSTALL" "$_dir" >/dev/null 2>&1
+  if [ "${2:-}" = "--with-deps" ]; then
+    ln -s "$KIT_DIR/node_modules" "$_dir/node_modules"
+  fi
+  printf '%s' "$_dir"
+}
+
+# git runs hooks with the repo root as cwd, and node resolves node_modules
+# from there — running one from anywhere else would search the wrong tree.
+# </dev/null matters too: pre-push reads its refs from stdin.
+in_repo() {
+  _d="$1"
+  shift
+  (cd "$_d" && "$@" </dev/null)
+}
+
+ZERO_SHA=0000000000000000000000000000000000000000
+SOME_SHA=1111111111111111111111111111111111111111
+
+# Feed the hook git's own pre-push protocol — one "<local ref> <local sha>
+# <remote ref> <remote sha>" line per ref — rather than a side channel.
+push_refs() {
+  _d="$1"
+  shift
+  printf '%s\n' "$@" | (cd "$_d" && ./.githooks/pre-push)
+}
+
+check_branch() {
+  push_refs "$1" "refs/heads/$2 $SOME_SHA refs/heads/$2 $ZERO_SHA"
+}
+
+hooks_path() { git -C "$1" config --local --get core.hooksPath || true; }
+
 echo "== argument validation (nothing may be written before the target is validated)"
 
-ok "--help exits 0" "$INSTALL" --help
-"$INSTALL" --help >/dev/null 2>&1
-if [ -e "$PWD/--help" ] || [ -e "$TMP_ROOT/--help" ]; then
-  fail "--help must not create a directory named --help"
-else
-  pass "--help creates no directory"
-fi
+ok "--help exits 0"                      "$INSTALL" --help
+no "--help creates no directory here"    test -e "$PWD/--help"
+no "--help creates no directory in tmp"  test -e "$TMP_ROOT/--help"
 
 no "unknown option is rejected"          "$INSTALL" --bogus
 no "a removed option is rejected"        "$INSTALL" "$(new_repo argv0)" --toolchain npm
@@ -65,11 +99,7 @@ no "installing into the kit's own source is rejected" "$INSTALL" "$KIT_DIR"
 NOT_A_REPO="$TMP_ROOT/plain-dir"
 mkdir -p "$NOT_A_REPO"
 no "non-git directory is rejected" "$INSTALL" "$NOT_A_REPO"
-if [ -z "$(ls -A "$NOT_A_REPO")" ]; then
-  pass "rejected target is left untouched"
-else
-  fail "wrote into a target that was then rejected"
-fi
+ok "rejected target is left untouched" test -z "$(ls -A "$NOT_A_REPO")"
 
 echo "== a clean install puts every file where the docs say"
 
@@ -88,8 +118,7 @@ for f in .claude/git-conventions.yaml \
 done
 ok "the commit-msg hook is executable" test -x "$FRESH/.githooks/commit-msg"
 ok "the pre-push hook is executable"   test -x "$FRESH/.githooks/pre-push"
-ok "core.hooksPath points at the tracked hooks" \
-   sh -c '[ "$(git -C "$1" config --local --get core.hooksPath)" = ".githooks" ]' _ "$FRESH"
+ok "core.hooksPath points at the tracked hooks" test "$(hooks_path "$FRESH")" = ".githooks"
 ok "package.json declares commitlint"  grep -q '@commitlint/cli' "$FRESH/package.json"
 ok "package.json declares the config"  grep -q '@commitlint/config-conventional' "$FRESH/package.json"
 ok "package.json declares js-yaml"     grep -q 'js-yaml' "$FRESH/package.json"
@@ -134,8 +163,7 @@ echo "== a repo that already routes hooks elsewhere is not hijacked"
 HOOKED="$(new_repo hooked)"
 git -C "$HOOKED" config --local core.hooksPath .husky/_
 HOOKED_OUT="$("$INSTALL" "$HOOKED" 2>&1)"
-ok "the existing hooksPath is left alone" \
-   sh -c '[ "$(git -C "$1" config --local --get core.hooksPath)" = ".husky/_" ]' _ "$HOOKED"
+ok "the existing hooksPath is left alone" test "$(hooks_path "$HOOKED")" = ".husky/_"
 has "the collision is reported"        "$HOOKED_OUT" "already routes git hooks"
 has "the report says how to switch"    "$HOOKED_OUT" "core.hooksPath .githooks"
 
@@ -146,7 +174,7 @@ BARE="$(new_repo bare)"
 printf 'feat: x\n' > "$BARE/msg"
 # git runs hooks with the repo root as cwd; npx resolves node_modules from
 # there, so running the hook from anywhere else would find the wrong tree.
-BARE_OUT="$(cd "$BARE" && ./.githooks/commit-msg msg 2>&1 || true)"
+BARE_OUT="$(in_repo "$BARE" ./.githooks/commit-msg msg 2>&1 || true)"
 has "a missing commitlint names itself" "$BARE_OUT" "commitlint is not installed"
 has "and says how to fix it"            "$BARE_OUT" "npm install"
 
@@ -160,23 +188,12 @@ ln -s "$KIT_DIR/node_modules" "$E2E/node_modules"
 echo hello > "$E2E/file.txt"
 git -C "$E2E" add -A
 
-if git -C "$E2E" commit -q -m "nope, not conventional" >/dev/null 2>&1; then
-  fail "a non-conventional commit message is rejected"
-else
-  pass "a non-conventional commit message is rejected"
-fi
-
-if git -C "$E2E" commit -q -m "wip: a type that is not on the list" >/dev/null 2>&1; then
-  fail "a type absent from git-conventions.yaml is rejected"
-else
-  pass "a type absent from git-conventions.yaml is rejected"
-fi
-
-if git -C "$E2E" commit -q -m "feat: a type that is on the list"; then
-  pass "a conventional commit message is accepted"
-else
-  fail "a conventional commit message is accepted"
-fi
+no "a non-conventional commit message is rejected" \
+   git -C "$E2E" commit -q -m "nope, not conventional"
+no "a type absent from git-conventions.yaml is rejected" \
+   git -C "$E2E" commit -q -m "wip: a type that is not on the list"
+ok "a conventional commit message is accepted" \
+   git -C "$E2E" commit -q -m "feat: a type that is on the list"
 
 # Prove the yaml is the source of truth, not a hardcoded list: add a type and
 # the same message that was just rejected must now pass.
@@ -186,36 +203,33 @@ sed -i.bak 's/^commit_types:$/commit_types:\n  - wip/' "$E2E/.claude/git-convent
 rm -f "$E2E/.claude/git-conventions.yaml.bak"
 echo again > "$E2E/file.txt"
 git -C "$E2E" add -A
-if git -C "$E2E" commit -q -m "wip: now allowed by the yaml"; then
-  pass "adding a type to git-conventions.yaml changes what the hook accepts"
-else
-  fail "adding a type to git-conventions.yaml changes what the hook accepts"
-fi
+ok "adding a type to git-conventions.yaml changes what the hook accepts" \
+   git -C "$E2E" commit -q -m "wip: now allowed by the yaml"
 
 echo "== branch names are judged against git-conventions.yaml"
 
-BR="$(new_repo branch)"
-"$INSTALL" "$BR" >/dev/null 2>&1
+BR="$(installed_repo branch --with-deps)"
 
-# COMMITTEE_BRANCH is how CI passes the branch under test, since a PR build
-# checks out a detached merge ref with no branch name of its own.
-check_branch() { (cd "$BR" && COMMITTEE_BRANCH="$1" ./.githooks/pre-push >/dev/null 2>&1); }
-
+# Each of these goes through the hook the way git would drive it on a push.
 for good in main master develop feature/add-oauth-login claude/scaffold-the-kit fix/off-by-one chore/bump-deps; do
-  ok "accepts '$good'" check_branch "$good"
+  ok "accepts '$good'" check_branch "$BR" "$good"
 done
 
 # docs/ and perf/ are commit_types, note/ and question/ are comment_labels.
-# All four are in the same YAML file, so only the sed's range address keeps
-# them out of the branch list — which nothing else exercises.
+# All four live in the same YAML file, so only reading branch_types
+# specifically keeps them out of the branch list.
+#
+# A name containing a space is not listed: git refuses such a ref itself, so
+# it cannot reach the hook through the push protocol. The description regex
+# still rejects it; there is simply no way to get one here.
 for bad in Feature/Capitalized feature/Has-Capitals feature/trailing- feature/double--hyphen \
-           nosuchtype/thing no-slash-at-all feature/ "feature/x y" \
+           nosuchtype/thing no-slash-at-all feature/ \
            docs/only-a-commit-type perf/only-a-commit-type \
            note/only-a-comment-label question/only-a-comment-label; do
-  no "rejects '$bad'" check_branch "$bad"
+  no "rejects '$bad'" check_branch "$BR" "$bad"
 done
 
-BR_OUT="$(cd "$BR" && COMMITTEE_BRANCH=nosuchtype/thing ./.githooks/pre-push 2>&1 || true)"
+BR_OUT="$(check_branch "$BR" nosuchtype/thing 2>&1 || true)"
 has "the rejection explains the expected shape" "$BR_OUT" "<type>/<description>"
 has "the rejection lists the allowed types"     "$BR_OUT" "feature"
 has "the rejection says how to fix it"          "$BR_OUT" "git branch -m"
@@ -223,11 +237,24 @@ has "the rejection says how to fix it"          "$BR_OUT" "git branch -m"
 # Source of truth, again: the hook must follow the yaml, not a baked-in list.
 sed -i.bak 's|^branch_types:$|branch_types:\n  - spike|' "$BR/.claude/git-conventions.yaml"
 rm -f "$BR/.claude/git-conventions.yaml.bak"
-ok "a type added to the yaml becomes acceptable" check_branch "spike/try-something"
+ok "a type added to the yaml becomes acceptable" check_branch "$BR" spike/try-something
 
 # A detached HEAD has no branch to judge; the hook must not block the push.
-ok "a detached HEAD is not blocked" \
-   sh -c 'cd "$1" && COMMITTEE_BRANCH= ./.githooks/pre-push' _ "$BR"
+git -C "$BR" commit -q --allow-empty -m "chore: something to detach from"
+git -C "$BR" checkout -q --detach HEAD
+ok "a detached HEAD is not blocked" in_repo "$BR" ./.githooks/pre-push
+# A deletion and a tag push carry no branch name to judge either.
+ok "a branch deletion is not blocked" \
+   push_refs "$BR" "refs/heads/Bad_Name $ZERO_SHA refs/heads/Bad_Name $SOME_SHA"
+ok "a tag push is not blocked" \
+   push_refs "$BR" "refs/tags/v1.0 $SOME_SHA refs/tags/v1.0 $ZERO_SHA"
+
+# Reading the refs being pushed rather than HEAD is what makes this work:
+# `git push origin a b` from a good branch used to be judged on HEAD alone,
+# so a bad second branch went through unexamined.
+no "a bad branch is caught even when it is not the one checked out" \
+   push_refs "$BR" "refs/heads/feature/fine $SOME_SHA refs/heads/feature/fine $ZERO_SHA" \
+                   "refs/heads/Bad_Second $SOME_SHA refs/heads/Bad_Second $ZERO_SHA"
 
 echo "== end to end: a real push through the installed hook"
 
@@ -257,7 +284,7 @@ ln -s "$KIT_DIR/node_modules" "$CFG/node_modules"
 printf 'feat: x\n' > "$CFG/msg"
 cp "$CFG/.claude/git-conventions.yaml" "$CFG/healthy.yaml"
 
-run_hook() { (cd "$CFG" && ./.githooks/commit-msg msg 2>&1 || true); }
+run_hook() { in_repo "$CFG" ./.githooks/commit-msg msg 2>&1 || true; }
 
 rm "$CFG/.claude/git-conventions.yaml"
 CFG_OUT="$(run_hook)"
@@ -277,8 +304,7 @@ CFG_OUT="$(run_hook)"
 has "malformed YAML is reported as YAML"       "$CFG_OUT" "not valid YAML"
 
 cp "$CFG/healthy.yaml" "$CFG/.claude/git-conventions.yaml"
-ok "a healthy config still accepts a good message" \
-   sh -c 'cd "$1" && ./.githooks/commit-msg msg' _ "$CFG"
+ok "a healthy config still accepts a good message" in_repo "$CFG" ./.githooks/commit-msg msg
 
 echo "== the hooks reach a teammate's clone, not just the installer's machine"
 
@@ -300,17 +326,13 @@ git -C "$MATE" config user.email m@example.invalid
 git -C "$MATE" config user.name mate
 
 ok "a fresh clone receives the hook files" test -x "$MATE/.githooks/commit-msg"
-if [ -z "$(git -C "$MATE" config --local --get core.hooksPath)" ]; then
-  pass "a fresh clone starts with no hooksPath (this is why prepare exists)"
-else
-  fail "a fresh clone unexpectedly already had hooksPath set"
-fi
+ok "a fresh clone starts with no hooksPath (this is why prepare exists)" \
+   test -z "$(hooks_path "$MATE")"
 
 # Run exactly what `npm install` would run as prepare.
 PREPARE="$(node -e 'const fs=require("fs");process.stdout.write(JSON.parse(fs.readFileSync(process.argv[1],"utf8")).scripts.prepare)' "$KIT_DIR/templates/package.json.example")"
 (cd "$MATE" && sh -c "$PREPARE")
-ok "the prepare script wires the clone up" \
-   sh -c '[ "$(git -C "$1" config --local --get core.hooksPath)" = ".githooks" ]' _ "$MATE"
+ok "the prepare script wires the clone up" test "$(hooks_path "$MATE")" = ".githooks"
 
 ln -s "$KIT_DIR/node_modules" "$MATE/node_modules"
 echo x > "$MATE/f.txt"
@@ -320,31 +342,27 @@ no "the teammate's bad commit is now rejected" \
 ok "and a good one is accepted" \
    git -C "$MATE" commit -q -m "feat: something conventional"
 
-echo "== the branch check fails closed in CI and stays lenient locally"
+echo "== an unreadable conventions file fails closed, always"
 
-# In CI this hook is the only branch-name gate, so a config it cannot read
-# must stop the build rather than wave it through with a note on stderr.
-STRICT="$(new_repo strict)"
-"$INSTALL" "$STRICT" >/dev/null 2>&1
+# There is no lenient path any more: the hook needs node and js-yaml, which
+# are present whenever it can run at all, so a config it cannot read is a
+# real misconfiguration rather than a state to wave through.
+STRICT="$(installed_repo strict --with-deps)"
 cp "$STRICT/.claude/git-conventions.yaml" "$STRICT/healthy.yaml"
 
 rm "$STRICT/.claude/git-conventions.yaml"
-ok "a missing config does not block a local push" \
-   sh -c 'cd "$1" && ./.githooks/pre-push' _ "$STRICT"
-no "a missing config fails the check in CI" \
-   sh -c 'cd "$1" && CI=true COMMITTEE_BRANCH=feature/x ./.githooks/pre-push' _ "$STRICT"
+no "a missing config is refused" check_branch "$STRICT" feature/x
 
-# Flow-style YAML is valid and js-yaml reads it, but the hook's sed cannot —
-# exactly the silent-disable this guards against.
-printf 'branch_types: [feature, fix]\ncommit_types:\n  - feat\n' > "$STRICT/.claude/git-conventions.yaml"
-no "an unreadable branch_types fails the check in CI" \
-   sh -c 'cd "$1" && CI=true COMMITTEE_BRANCH=feature/x ./.githooks/pre-push' _ "$STRICT"
-STRICT_OUT="$(cd "$STRICT" && CI=true COMMITTEE_BRANCH=feature/x ./.githooks/pre-push 2>&1 || true)"
-has "and says why it refused"  "$STRICT_OUT" "Refusing to skip"
+printf 'commit_types:
+  - feat
+' > "$STRICT/.claude/git-conventions.yaml"
+no "a config with no branch_types is refused" check_branch "$STRICT" feature/x
+STRICT_OUT="$(check_branch "$STRICT" feature/x 2>&1 || true)"
+has "and says what it could not read" "$STRICT_OUT" "branch_types"
 
 cp "$STRICT/healthy.yaml" "$STRICT/.claude/git-conventions.yaml"
-ok "a healthy config still passes in CI" \
-   sh -c 'cd "$1" && CI=true COMMITTEE_BRANCH=feature/x ./.githooks/pre-push' _ "$STRICT"
+ok "a healthy config passes" check_branch "$STRICT" feature/x
+
 
 echo "== the Skill is refreshed on re-install, and only the Skill"
 
