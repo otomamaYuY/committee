@@ -55,12 +55,20 @@ if ! ( cd "$REPO" && case "$PM" in
     yarn) yarn install ;;
     yarn-pnp)
       yarn set version berry
-      # Yarn 4 quarantines very recently published versions — its
-      # supply-chain policy, not something this kit is testing. The key is
-      # named differently across 4.x, so try the ones that exist.
       yarn config set nodeLinker pnp
-      yarn config set npmMinimalAgeGate 0 2>/dev/null ||
-        yarn config set enableHardenedMode false 2>/dev/null || true
+
+      # Two Yarn 4 supply-chain defaults get in the way here, and neither is
+      # anything this kit is testing:
+      #
+      #   npmMinimalAgeGate quarantines very recently published versions.
+      #
+      #   Hardened mode turns itself on for a public pull request and forbids
+      #   an install that would create a lockfile. This repo is scratch and
+      #   has none by design, so the install it forbids is exactly the one
+      #   under test. It is right to default on and right to disable here.
+      yarn config set npmMinimalAgeGate 0 2>/dev/null || true
+      yarn config set enableHardenedMode false 2>/dev/null || true
+
       echo "yarn is now $(yarn --version)"
       yarn install
       ;;
