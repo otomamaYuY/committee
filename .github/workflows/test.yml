@@ -51,16 +51,20 @@ jobs:
       # deletion that looks deliberate in a diff. Nothing breaks (they are
       # optional), so nobody would notice. Compare against a resolve with no
       # node_modules and no lockfile, which is what CI always starts from.
+      # Resolved in a scratch directory: the earlier version did this in
+      # place, and deleting node_modules left every later step without the
+      # dependencies it needs. A check that breaks what follows it is worse
+      # than no check.
       - name: the lockfile matches a clean resolve
         run: |
-          cp package-lock.json /tmp/committed-lock.json
-          rm -rf node_modules package-lock.json
-          npm install --package-lock-only --no-audit --no-fund >/dev/null
-          if ! diff -u /tmp/committed-lock.json package-lock.json; then
+          work="$(mktemp -d)"
+          cp package.json "$work/"
+          ( cd "$work" && npm install --package-lock-only --no-audit --no-fund >/dev/null )
+          if ! diff -u package-lock.json "$work/package-lock.json"; then
             echo "::error::package-lock.json is not what a clean resolve produces. Regenerate it with 'rm -rf node_modules package-lock.json && npm install', not by running npm install over an existing tree."
             exit 1
           fi
-          cp /tmp/committed-lock.json package-lock.json
+          rm -rf "$work"
       - name: tests
         run: npm test
 
