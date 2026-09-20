@@ -116,8 +116,9 @@ re-implementation of it, so the two cannot drift apart.
 
 ## Requirements
 
-Node, and a package manager that populates `node_modules/.bin` — the hooks
-resolve `commitlint` from there. npm is what the test suite exercises; pnpm
+**Node 22.12 or newer** — commitlint 21 requires it, and `package.json`
+declares it — and a package manager that populates `node_modules/.bin`,
+which is where the hooks resolve `commitlint` from. npm is what the test suite exercises; pnpm
 and Yarn Classic work by the same mechanism. **Yarn PnP does not**, because
 it deliberately has no `node_modules`; use `nodeLinker: node-modules`, or
 call commitlint through `yarn commitlint` in your own hook.

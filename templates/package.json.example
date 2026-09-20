@@ -2,11 +2,14 @@
   "name": "your-project",
   "private": true,
   "scripts": {
-    "prepare": "git config --local core.hooksPath .githooks"
+    "prepare": "node -e \"try{require('child_process').execSync('git config --local core.hooksPath .githooks',{stdio:'ignore'})}catch{console.warn('[committee] not a git repository - hooks not wired')}\""
   },
   "devDependencies": {
-    "@commitlint/cli": "^19.0.0",
-    "@commitlint/config-conventional": "^19.0.0",
-    "js-yaml": "^4.1.0"
+    "@commitlint/cli": "^21.2.3",
+    "@commitlint/config-conventional": "^21.2.3",
+    "js-yaml": "^5.4.2"
+  },
+  "engines": {
+    "node": ">=22.12.0"
   }
 }
