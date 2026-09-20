@@ -151,6 +151,12 @@ example cannot quietly stop matching what you would install.
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for the test suites.
 
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md). `main` is protected: changes go
+through a pull request, and the `conventions` and `test` checks must pass.
+Report security issues privately — see [SECURITY.md](SECURITY.md).
+
 ## License
 
 MIT — see [LICENSE](LICENSE). The four specifications this kit implements
