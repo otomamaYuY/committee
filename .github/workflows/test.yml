@@ -105,11 +105,20 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version: 22
-      - name: what git is doing to line endings here
+      # Before .gitattributes, `file` reported CRLF here and the hooks ran
+      # anyway — Git Bash tolerates it. This asserts the tolerance is no
+      # longer what the kit depends on.
+      - name: the hooks arrive with LF endings
         shell: bash
         run: |
-          git config --get core.autocrlf || echo "core.autocrlf: unset"
-          file .githooks/commit-msg .githooks/pre-push || true
+          echo "core.autocrlf: $(git config --get core.autocrlf || echo unset)"
+          file .githooks/commit-msg .githooks/pre-push templates/githooks/*
+          for f in .githooks/commit-msg .githooks/pre-push templates/githooks/*; do
+            if grep -qU $'\r' "$f"; then
+              echo "::error::$f has CRLF line endings; .gitattributes should have prevented that"
+              exit 1
+            fi
+          done
       - name: the kit works through Git Bash
         shell: bash
         run: bash tests/package_manager_test.sh npm

@@ -1,0 +1,19 @@
+# The hooks and the installer are POSIX sh and bash. Git Bash on Windows
+# happens to tolerate CRLF in them today — the Windows CI job confirmed the
+# hooks arrive with CRLF terminators and still work — but that is the
+# interpreter being forgiving, not the scripts being correct. A `\r` at a
+# line end is part of the last argument to any other sh, which fails with an
+# error naming neither the line endings nor the hook.
+#
+# Pin them to LF so it does not depend on that tolerance.
+*.sh            text eol=lf
+install.sh      text eol=lf
+.githooks/*     text eol=lf
+templates/githooks/* text eol=lf
+
+# Same reasoning for the files the hooks read and the config they load.
+*.yaml          text eol=lf
+*.yml           text eol=lf
+*.json          text eol=lf
+*.js            text eol=lf
+*.md            text eol=lf
