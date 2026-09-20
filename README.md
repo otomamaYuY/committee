@@ -76,9 +76,10 @@ package.json                        # three dev dependencies
 ```
 
 On a pull request CI checks the commit messages, the branch name, and the
-**pull request title** — which matters more than it sounds: a squash merge
-puts the PR title on your default branch and discards the commits, so on a
-squash workflow it is the only subject that survives.
+**pull request title** — which matters more than it sounds: GitHub turns that
+title into a commit subject on your default branch, as the squash commit's
+subject on a squash workflow or as the merge commit's where merge commits are
+configured to use it. It is also the one string nothing else here checks.
 
 The branch check is the *same* `pre-push` script developers run locally,
 driven through git's own protocol rather than re-implemented, so the two

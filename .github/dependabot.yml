@@ -9,7 +9,8 @@ updates:
     open-pull-requests-limit: 3
     commit-message:
       # Conventional Commits, because this repo enforces them on itself and
-      # a Dependabot PR is squashed onto the default branch like any other.
+      # Dependabot's commits are preserved on the default branch like any
+      # other PR's.
       prefix: build
       prefix-development: build
       include: scope

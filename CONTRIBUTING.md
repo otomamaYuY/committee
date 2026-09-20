@@ -13,9 +13,17 @@ This repo dogfoods its own conventions:
 2. Make your change with a matching commit message
    (e.g. `docs: clarify the install steps`).
 3. Run `npm test` before opening the PR.
-4. Open a PR. Give it a Conventional Commits title: merges here are squashed,
-   so the PR title becomes the commit subject on `main` — CI checks it.
+4. Open a PR. Give it a Conventional Commits title: this repo merges with a
+   merge commit whose subject is the PR title, so it lands on `main` verbatim
+   — CI checks it. Your individual commits are preserved rather than squashed
+   away, so each one has to stand on its own too.
 5. `conventions` and `test` run automatically.
+
+`git log --first-parent` gives one line per merged PR, which is the summary
+view a squash workflow would have left behind. `git bisect --first-parent`
+(git 2.29 or newer) is worth knowing about for the case where a PR's
+intermediate commits do not build: it walks the merges instead, and you bisect
+inside the one it lands on by hand.
 
 ## Tests
 
