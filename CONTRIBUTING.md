@@ -13,7 +13,9 @@ This repo dogfoods its own conventions:
 2. Make your change with a matching commit message
    (e.g. `docs: clarify the install steps`).
 3. Run `npm test` before opening the PR.
-4. Open a PR — `conventions` and `test` run automatically on it.
+4. Open a PR. Give it a Conventional Commits title: merges here are squashed,
+   so the PR title becomes the commit subject on `main` — CI checks it.
+5. `conventions` and `test` run automatically.
 
 ## Tests
 

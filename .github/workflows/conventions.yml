@@ -41,6 +41,15 @@ jobs:
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: npx --no -- commitlint --from "$BASE_SHA" --to "$HEAD_SHA" --verbose
 
+      # A squash merge puts the PULL REQUEST's title on the default branch
+      # and throws away every commit checked above. So on a squash workflow
+      # this is the only subject that actually survives — and it is the one
+      # nothing else looks at. commitlint reads it from stdin; no extra tool.
+      - name: pull request title
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        run: printf '%s' "$PR_TITLE" | npx --no -- commitlint --verbose
+
       # The same hook developers run locally, driven through git's own
       # pre-push protocol: one "<local ref> <local sha> <remote ref>
       # <remote sha>" line per ref. A pull_request build checks out a
