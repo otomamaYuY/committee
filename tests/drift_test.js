@@ -142,6 +142,34 @@ for (const tpl of walk('templates').sort()) {
   else no(`${tpl} is referenced by install.sh`, 'it would ship to nobody');
 }
 
+// Splitting the README into docs/ created a new way for the docs to rot: a
+// link that points at nothing, or a page nothing points at. Neither breaks
+// anything at runtime, so nothing else would catch it.
+console.log('== the docs link to each other and to files that exist');
+
+const MARKDOWN = ['README.md', 'CONTRIBUTING.md', 'CLAUDE.md', 'AGENTS.md', 'SECURITY.md']
+  .concat(fs.readdirSync(path.join(ROOT, 'docs')).map(f => path.join('docs', f)));
+
+const linked = new Set();
+
+for (const file of MARKDOWN) {
+  const text = read(file);
+  for (const m of text.matchAll(/\]\(([^)#][^)]*)\)/g)) {
+    const target = m[1];
+    if (/^[a-z]+:/.test(target)) continue;            // external
+    const resolved = path.normalize(path.join(path.dirname(file), target.split('#')[0]));
+    linked.add(resolved);
+    if (fs.existsSync(path.join(ROOT, resolved))) ok(`${file} -> ${target}`);
+    else no(`${file} -> ${target}`, 'the link points at nothing');
+  }
+}
+
+for (const doc of fs.readdirSync(path.join(ROOT, 'docs'))) {
+  const rel = path.join('docs', doc);
+  if (linked.has(rel)) ok(`${rel} is reachable`);
+  else no(`${rel} is reachable`, 'nothing links to it, so nobody will find it');
+}
+
 // --- 3. workflows are pinned, scoped, and injection-free ---------------------
 console.log('== workflows are pinned and scoped');
 
