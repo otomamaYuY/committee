@@ -49,8 +49,14 @@ prefix or review label may be written down. The Skill, `AGENTS.md`,
 yourself adding a second list anywhere, that is the bug — the manual-sync
 version of this design is what the kit replaced.
 
-`pre-push` parses the YAML with `sed`, deliberately: it has to work in a
-fresh clone before `npm install` has ever run. Keep it dependency-free.
+Both hooks read it through `js-yaml`, the same parser commitlint uses. A
+second, weaker YAML reader written in `sh` would buy nothing: git does not
+call a hook until `core.hooksPath` is set, and that happens in the `prepare`
+script, so `npm install` has always run by the time a hook can run at all.
+
+`pre-push` takes the refs being pushed from git's own protocol on stdin,
+falling back to HEAD when run directly. That is why there is no
+product-specific environment variable for CI to set.
 
 ## Do not weaken the enforcement to get a change through
 

@@ -79,8 +79,8 @@ fi
 
 echo "Installing into: $TARGET_DIR (force: $FORCE)"
 
-WRITTEN=""
-SKIPPED=""
+WRITTEN=()
+SKIPPED=()
 MISSING_DEPS="no"
 MISSING_AGENTS="no"
 HOOKS_PATH_NOTE=""
@@ -93,7 +93,7 @@ install_file() {
   _src="$1"
   _dest="$2"
   if [ -e "$_dest" ] && [ "$FORCE" != "yes" ]; then
-    SKIPPED="${SKIPPED}  ${_dest#"$TARGET_DIR"/}"$'\n'
+    SKIPPED+=("  ${_dest#"$TARGET_DIR"/}")
     return 1
   fi
   # An `install_file ... || true` caller suppresses `set -e` for this body, so
@@ -102,7 +102,7 @@ install_file() {
     echo "Error: failed to copy $_src -> $_dest" >&2
     exit 1
   fi
-  WRITTEN="${WRITTEN}  ${_dest#"$TARGET_DIR"/}"$'\n'
+  WRITTEN+=("  ${_dest#"$TARGET_DIR"/}")
   return 0
 }
 
@@ -115,6 +115,11 @@ mkdir -p "$TARGET_DIR/.claude/skills"
 # inside the target. A symlinked .claude or .claude/skills — a plausible way
 # to share one config across repos — would otherwise send `rm -rf` out of the
 # repository entirely, and the report would call it "(refreshed)".
+#
+# The two checks below are complementary, not belt-and-braces: `pwd -P`
+# cannot see a symlink at the final component (it resolves the parent), and
+# the -L loop cannot see a parent that resolves elsewhere without being a
+# symlink itself.
 for _part in .claude .claude/skills .claude/skills/git-conventions; do
   if [ -L "$TARGET_DIR/$_part" ]; then
     echo "Error: $_part is a symlink; refusing to replace the Skill through it" >&2
@@ -139,7 +144,7 @@ fi
 
 rm -rf "$_skill_dest"
 cp -r "$SRC_DIR/skills/git-conventions" "$_skill_dest"
-WRITTEN="${WRITTEN}  .claude/skills/git-conventions/ $_skill_note"$'\n'
+WRITTEN+=("  .claude/skills/git-conventions/ $_skill_note")
 
 # --- Conventions config -----------------------------------------------------
 install_file "$SRC_DIR/templates/git-conventions.yaml" "$TARGET_DIR/.claude/git-conventions.yaml" || true
@@ -171,7 +176,7 @@ done
 EXISTING_HOOKS_PATH="$(git -C "$TARGET_DIR" config --local --get core.hooksPath || true)"
 if [ -z "$EXISTING_HOOKS_PATH" ] || [ "$EXISTING_HOOKS_PATH" = ".githooks" ]; then
   git -C "$TARGET_DIR" config --local core.hooksPath .githooks
-  WRITTEN="${WRITTEN}  (git config core.hooksPath = .githooks)"$'\n'
+  WRITTEN+=("  (git config core.hooksPath = .githooks)")
 else
   HOOKS_PATH_NOTE="$EXISTING_HOOKS_PATH"
 fi
@@ -197,12 +202,12 @@ fi
 # --- Report -----------------------------------------------------------------
 echo
 echo "Written:"
-printf '%s' "$WRITTEN"
+printf '%s\n' "${WRITTEN[@]}"
 
-if [ -n "$SKIPPED" ]; then
+if [ ${#SKIPPED[@]} -gt 0 ]; then
   echo
   echo "Skipped (already present — left untouched):"
-  printf '%s' "$SKIPPED"
+  printf '%s\n' "${SKIPPED[@]}"
   echo
   echo "  Re-run with --force to overwrite these, after checking you do not"
   echo "  need their current contents."

@@ -1,5 +1,11 @@
 name: conventions
-on: pull_request
+# `edited` is not in the default set (opened, synchronize, reopened), and
+# without it the pull request title is checked once at open and never again
+# — so retitling after a green run puts an unchecked subject on the default
+# branch, which is precisely the gap the title check exists to close.
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, edited]
 # Both checks only read the history they validate.
 permissions:
   contents: read
@@ -10,7 +16,9 @@ jobs:
       - uses: actions/checkout@v4
         with: { fetch-depth: 0 }
       - uses: actions/setup-node@v4
-        with: { node-version: 20 }
+        with:
+          node-version: 20
+          cache: npm
       # `npm install` rather than `npm ci`: it uses the lockfile when there is
       # one and still works in a repo that has not committed one yet.
       # --ignore-scripts because this job only needs commitlint to run, and a
@@ -21,9 +29,11 @@ jobs:
       # next step with a module-resolution error naming neither the packages
       # nor this kit — the most likely way for an adopter to land here, since
       # install.sh cannot add dependencies to an existing package.json.
+      # `require.resolve` rather than `npx --version`: same answer, ~40ms
+      # instead of ~320ms.
       - name: preflight
         run: |
-          if ! npx --no -- commitlint --version >/dev/null 2>&1; then
+          if ! node -e 'require.resolve("@commitlint/cli")' >/dev/null 2>&1; then
             echo "::error::commitlint is not installed. Add @commitlint/cli, @commitlint/config-conventional and js-yaml to devDependencies (see package.json.example in the committee kit)."
             exit 1
           fi
@@ -37,11 +47,28 @@ jobs:
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: npx --no -- commitlint --from "$BASE_SHA" --to "$HEAD_SHA" --verbose
 
-      # The same hook developers run locally, so CI cannot disagree with it.
+      # A squash merge puts the PULL REQUEST's title on the default branch
+      # and throws away every commit checked above. So on a squash workflow
+      # this is the only subject that actually survives — and it is the one
+      # nothing else looks at. commitlint reads it from stdin; no extra tool.
+      - name: pull request title
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        run: printf '%s' "$PR_TITLE" | npx --no -- commitlint --verbose
+
+      # The same hook developers run locally, driven through git's own
+      # pre-push protocol: one "<local ref> <local sha> <remote ref>
+      # <remote sha>" line per ref. A pull_request build checks out a
+      # detached merge ref, so the branch under test is fed in rather than
+      # read from HEAD — through the hook's real input, not a side channel.
+      #
       # This deliberately runs the hook from the PR's own checkout: a PR that
       # fixes the hook has to be testable. The job holds only contents: read
       # and no secrets, so what a PR can reach here it could reach anyway.
       - name: branch name
         env:
-          COMMITTEE_BRANCH: ${{ github.head_ref }}
-        run: ./.githooks/pre-push
+          BRANCH: ${{ github.head_ref }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          printf 'refs/heads/%s %s refs/heads/%s %s\n' \
+            "$BRANCH" "$HEAD_SHA" "$BRANCH" "$HEAD_SHA" | ./.githooks/pre-push
