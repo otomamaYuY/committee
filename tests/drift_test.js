@@ -88,6 +88,36 @@ if (!Array.isArray(typeEnum)) {
      `yaml:       ${conventions.commit_types.join(', ')}\n       commitlint: ${typeEnum.join(', ')}`);
 }
 
+// scopes: is optional, so there are two correct states and the test has to
+// know which one this repo is in. Both fail the same way if commitlint stops
+// reading the yaml: a stale hardcoded list, or a rule that lingers after the
+// block is deleted and silently rejects scopes the file now allows.
+const scopeEnum = commitlintConfig.rules && commitlintConfig.rules['scope-enum']
+  ? commitlintConfig.rules['scope-enum'][2]
+  : undefined;
+
+if (conventions.scopes === undefined || conventions.scopes === null) {
+  if (scopeEnum === undefined) ok('no yaml scopes, so commitlint enforces none');
+  else no('no yaml scopes, so commitlint enforces none',
+          `commitlint still enforces: ${JSON.stringify(scopeEnum)}`);
+} else if (JSON.stringify(scopeEnum) === JSON.stringify(conventions.scopes)) {
+  ok('commitlint enforces exactly the yaml scopes');
+} else {
+  no('commitlint enforces exactly the yaml scopes',
+     `yaml:       ${JSON.stringify(conventions.scopes)}\n       commitlint: ${JSON.stringify(scopeEnum)}`);
+}
+
+// The template is what every adopting repo starts from, and a non-empty
+// scopes list there would reject correct commits in a repo whose seams the
+// kit has never seen.
+const templateScopes = yaml.load(read('templates/git-conventions.yaml')).scopes;
+if (templateScopes === undefined || templateScopes === null) {
+  ok('the shipped template enforces no scopes');
+} else {
+  no('the shipped template enforces no scopes',
+     `it ships ${JSON.stringify(templateScopes)} — adopters would be judged against this kit's seams`);
+}
+
 // The pre-push hook must read the yaml rather than restate it — a second
 // copy of the list is how the local hook and CI start disagreeing.
 const prePush = read('.githooks/pre-push');

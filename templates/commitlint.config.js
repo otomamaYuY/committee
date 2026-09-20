@@ -2,7 +2,8 @@ const fs = require('fs');
 const path = require('path');
 const yaml = require('js-yaml');
 
-// The allowed types live in .claude/git-conventions.yaml, not in this file.
+// The allowed types — and the optional scopes — live in
+// .claude/git-conventions.yaml, not in this file.
 // Every failure below is therefore reported against THAT file. Left to
 // itself commitlint blames this one instead — a missing config produces
 // "Please add rules to your commitlint.config.js", and a typo in the
@@ -46,9 +47,31 @@ if (!Array.isArray(commitTypes) || commitTypes.length === 0) {
   );
 }
 
+const rules = {
+  'type-enum': [2, 'always', commitTypes],
+};
+
+// "scopes:" is optional, and absent from the shipped template. A list of
+// scopes names the seams of one particular repo, so a default could only be
+// a guess — and every wrong guess rejects a correct commit, which is the
+// pressure that ends in --no-verify. The rule therefore exists only once a
+// repo has written its own list. Conventional Commits keeps the scope itself
+// optional, so a listed repo can still commit without one.
+const scopes = parsed.scopes;
+
+if (scopes !== undefined && scopes !== null) {
+  const usable = Array.isArray(scopes) && scopes.length > 0 &&
+    scopes.every(s => typeof s === 'string' && s.trim() !== '');
+  if (!usable) {
+    fail(
+      'a "scopes:" key is present but is not a non-empty list of names',
+      'list the allowed scopes under it, or delete the key to accept any scope'
+    );
+  }
+  rules['scope-enum'] = [2, 'always', scopes];
+}
+
 module.exports = {
   extends: ['@commitlint/config-conventional'],
-  rules: {
-    'type-enum': [2, 'always', commitTypes],
-  },
+  rules,
 };

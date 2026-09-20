@@ -5,10 +5,11 @@ description: Use whenever creating a git branch, writing a commit message, taggi
 
 # Git Conventions
 
-Allowed types/prefixes/labels are defined in `.claude/git-conventions.yaml`
-— the single source of truth, also read by `commitlint.config.js` and the
-`pre-push` hook. Read that file before constructing a branch name, commit
-message, or review comment; do not assume a fixed list.
+Allowed types/scopes/prefixes/labels are defined in
+`.claude/git-conventions.yaml` — the single source of truth, also read by
+`commitlint.config.js` and the `pre-push` hook. Read that file before
+constructing a branch name, commit message, or review comment; do not assume
+a fixed list.
 
 ## Shape (from the specs themselves — rarely changes)
 
@@ -19,6 +20,12 @@ message, or review comment; do not assume a fixed list.
 - **Commit** — [Conventional Commits](https://www.conventionalcommits.org):
   `<type>[optional scope]: <description>`. Breaking change: `!` after
   type/scope, or a `BREAKING CHANGE:` footer.
+- **Scope** — optional, and enforced only where the conventions file has a
+  `scopes:` block. `feat` says what happened; `feat(hooks)` says where, which
+  is what makes the history readable without the diffs. With no such block
+  any scope is accepted. With one, a change that fits none of the listed
+  scopes wants a new entry in that file — not a commit stripped of its
+  scope to get through. A genuinely repo-wide change correctly has none.
 - **Version** — [SemVer](https://semver.org): MAJOR.MINOR.PATCH.
   feat→MINOR, fix→PATCH, BREAKING CHANGE→MAJOR. The commit type is what
   decides the next version, so pick it for what the change does, not for

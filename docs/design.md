@@ -30,21 +30,37 @@ is.
 
 ## One file decides everything
 
-`.claude/git-conventions.yaml` holds the allowed commit types, branch
-prefixes and review labels. Nothing else restates them:
+`.claude/git-conventions.yaml` holds the allowed commit types, scopes,
+branch prefixes and review labels. Nothing else restates them:
 
 ```
 .claude/git-conventions.yaml
         │
         ├──► .claude/skills/git-conventions/  the Skill quotes it to Claude Code
         ├──► AGENTS.md                        points Codex at it
-        ├──► commitlint.config.js             loads commit_types into type-enum
+        ├──► commitlint.config.js             loads commit_types into type-enum,
+        │                                     and scopes into scope-enum if present
         └──► .githooks/pre-push               parses branch_types out of it
 ```
 
 Add a type there and it is allowed everywhere at once — locally and in CI,
 with no second list to remember and no way for the hook and the pipeline to
 disagree.
+
+### Why `scopes:` is the one optional list
+
+The other three lists come from the specs, so the kit can ship them. Scopes
+do not: they name the seams of one particular repo, and a guessed default
+would reject correct commits in every repo that installed it — which is how
+a contributor ends up reaching for `--no-verify`, the one habit this kit
+exists to prevent. So the template ships the block commented out, and
+`scope-enum` is added only once a repo has written its own list.
+
+It is worth writing one. A type says what a change did; a scope says where.
+Together they make the history answerable without reading the diffs — by a
+person catching up, and by any tool, including an agent orienting itself in
+a repo it has not seen. A repo with no scopes list still works exactly as
+before; it just cannot be asked that second question.
 
 ## What this kit does not do
 

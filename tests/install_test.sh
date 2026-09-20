@@ -194,6 +194,60 @@ git -C "$E2E" add -A
 ok "adding a type to git-conventions.yaml changes what the hook accepts" \
    git -C "$E2E" commit -q -m "wip: now allowed by the yaml"
 
+echo "== scopes are opt-in, and enforced once opted in"
+
+# The template ships no scopes list on purpose: the kit cannot know an
+# adopter's seams, and a guessed list would reject correct commits in every
+# repo that installs it. So a fresh install must accept any scope at all --
+# and the only way to be sure is to commit one the kit has never heard of.
+SC="$(installed_repo scopes --with-deps)"
+echo one > "$SC/file.txt"
+git -C "$SC" add -A
+ok "a fresh install accepts a scope it was never told about" \
+   git -C "$SC" commit -q -m "feat(anything-at-all): scopes are not enforced yet"
+
+# Opting in: the same list mechanism as commit_types, in the same file.
+printf '\nscopes:\n  - api\n  - web\n' >> "$SC/.claude/git-conventions.yaml"
+echo two > "$SC/file.txt"
+git -C "$SC" add -A
+
+no "a scope absent from the list is now rejected" \
+   git -C "$SC" commit -q -m "feat(anything-at-all): no longer allowed"
+ok "a scope on the list is accepted" \
+   git -C "$SC" commit -q -m "feat(api): on the list"
+
+# Conventional Commits keeps the scope itself optional, and a repo-wide
+# change genuinely has none. Opting in must not quietly make it mandatory.
+echo three > "$SC/file.txt"
+git -C "$SC" add -A
+ok "a commit with no scope at all is still accepted" \
+   git -C "$SC" commit -q -m "chore: no scope, and none needed"
+
+# A scopes: key holding something that is not a list would otherwise reach
+# commitlint as a rule value it cannot use, and the reader would be sent to
+# commitlint.config.js rather than to the file they actually mistyped. A repo
+# of its own, because a second scopes: key in $SC would be caught earlier as
+# a duplicate mapping key and never reach the check under test.
+BADSC="$(installed_repo scopes-malformed --with-deps)"
+cp "$BADSC/.claude/git-conventions.yaml" "$BADSC/healthy.yaml"
+printf '\nscopes: not-a-list\n' >> "$BADSC/.claude/git-conventions.yaml"
+printf 'feat(api): x\n' > "$BADSC/msg"
+SC_OUT="$(in_repo "$BADSC" ./.githooks/commit-msg msg 2>&1 || true)"
+has "a malformed scopes: block is named"  "$SC_OUT" '"scopes:" key is present'
+has "and the conventions file is blamed"  "$SC_OUT" "git-conventions.yaml"
+has "and deleting the key is offered"     "$SC_OUT" "accept any scope"
+
+# An empty list is the same mistake wearing different clothes: it would make
+# commitlint reject every scope in the repo while looking deliberate.
+cp "$BADSC/healthy.yaml" "$BADSC/.claude/git-conventions.yaml"
+printf '\nscopes: []\n' >> "$BADSC/.claude/git-conventions.yaml"
+no "an empty scopes list is refused rather than enforced" \
+   in_repo "$BADSC" ./.githooks/commit-msg msg
+
+cp "$BADSC/healthy.yaml" "$BADSC/.claude/git-conventions.yaml"
+ok "the shipped file, which lists no scopes, accepts one anyway" \
+   in_repo "$BADSC" ./.githooks/commit-msg msg
+
 echo "== branch names are judged against git-conventions.yaml"
 
 BR="$(installed_repo branch --with-deps)"

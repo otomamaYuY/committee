@@ -40,3 +40,23 @@ comment_labels:
   - thought
   - chore
   - note
+
+# Optional, and deliberately empty here: a scope names the part of *your*
+# repo a change touches, so this kit cannot guess the list. Uncomment the
+# block and fill it in, and commitlint will reject any scope not on it.
+# Leave it as it is and any scope is accepted, which is the right default
+# until you know what your seams are.
+#
+# A scope is what turns `type` alone into a coordinate: `feat` says what
+# happened, `feat(billing)` says where — which is what makes the history
+# answerable by tooling, and by anyone asking what has been changing lately.
+#
+# Only add a name once it is a real seam someone would want to read the
+# history of. A list that does not cover a change you legitimately need to
+# make is a list that sends you looking for --no-verify — add the scope
+# here instead.
+#
+# scopes:
+#   - api
+#   - web
+#   - infra
