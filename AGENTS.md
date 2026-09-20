@@ -3,7 +3,7 @@
 Applies to every branch, commit message and review comment in this repo —
 whether written by a person or by a coding agent.
 
-The allowed types, branch prefixes and review labels live in
+The allowed types, scopes, branch prefixes and review labels live in
 `.claude/git-conventions.yaml`. **Read that file before writing a branch
 name, a commit message or a review comment.** Do not work from the examples
 below: they show the shape, not the list.
@@ -17,6 +17,18 @@ below: they show the shape, not the list.
 
 `main`, `master` and `develop` need no branch prefix. A breaking change is
 marked with `!` after the type/scope, or a `BREAKING CHANGE:` footer.
+
+## Scopes, when the repo defines them
+
+A scope names the part of the repo a change touches: `feat` says what
+happened, `feat(hooks)` says where. The two together are what let anyone —
+or any tool — read the history without reading the diffs.
+
+`scopes:` is optional. If the file has no such block, any scope is accepted
+and the choice is yours. If it does, a scope outside the list is rejected,
+and a change that genuinely does not fit any of them wants a new entry in
+that file rather than a commit without a scope. A repo-wide change that
+belongs to no single scope correctly has none.
 
 ## Picking the right type is your job, not the linter's
 

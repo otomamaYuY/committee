@@ -40,3 +40,24 @@ comment_labels:
   - thought
   - chore
   - note
+
+# Optional. A scope names the part of the repo a change touches, and it is
+# what turns `type` alone into a coordinate: `feat` says what happened,
+# `feat(hooks)` says where. Leave the block out entirely and any scope is
+# accepted, which is how every repo starts.
+#
+# Only add a name once it is a real seam someone would want to read the
+# history of. A list that does not cover a change you legitimately need to
+# make is a list that sends you looking for --no-verify — add the scope here
+# instead.
+scopes:
+  - hooks         # .githooks/
+  - commitlint    # commitlint.config.js
+  - skill         # .claude/skills/git-conventions/
+  - agents        # AGENTS.md
+  - install       # install.sh
+  - tests         # tests/
+  - docs          # README.md, docs/, CONTRIBUTING.md, SECURITY.md
+  - ci            # .github/workflows/
+  - deps          # dependencies (Dependabot writes this one)
+  - deps-dev      # devDependencies (Dependabot writes this one)
