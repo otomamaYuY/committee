@@ -76,7 +76,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        pm: [pnpm, yarn, yarn-pnp]
+        # npm belongs here too: it was only exercised by the Windows job,
+        # so the Linux side of the README's claim had a hole in it.
+        pm: [npm, pnpm, yarn, yarn-pnp]
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7

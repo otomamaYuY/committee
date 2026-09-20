@@ -86,8 +86,8 @@ cannot drift apart.
 
 ## Requirements
 
-**Node 22.12 or newer**. npm, pnpm, Yarn Classic and Yarn PnP are each
-exercised by CI, on Linux and on Windows through Git Bash.
+**Node 22.12 or newer**. On Linux, CI exercises npm, pnpm, Yarn Classic and
+Yarn PnP. On Windows it exercises npm, through Git Bash.
 
 → [What is verified, and what is not](docs/compatibility.md)
 

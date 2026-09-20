@@ -40,9 +40,14 @@ forgiving rather than the scripts being right: any other `sh` treats the
 the line endings nor the hook. `.gitattributes` now pins every shell
 script to LF, and the Windows job asserts it rather than assuming it.
 
-`tests/install_test.sh` is **not** run on Windows: it uses `ln -s`, which
-needs Developer Mode there. So the installer's argument handling and
-no-clobber behaviour are covered on Linux and macOS only.
+Two things the Windows job does **not** cover:
+
+- `tests/install_test.sh`, which uses `ln -s` and needs Developer Mode
+  there. The installer's argument handling and no-clobber behaviour are
+  covered on Linux and macOS only.
+- Any package manager but npm. pnpm, Yarn Classic and Yarn PnP are
+  exercised on Linux only, so "the hooks work on Windows" is known for npm
+  and unknown for the rest.
 
 The whole kit is three dev dependencies: `@commitlint/cli`,
 `@commitlint/config-conventional` and `js-yaml`.
@@ -57,10 +62,11 @@ once `core.hooksPath` is set, and that is the `prepare` script's job.
 |---|---|
 | `install.sh` behaviour | `tests/install_test.sh`, in CI |
 | The config file is the only list | `tests/drift_test.js`, in CI |
-| npm, pnpm, Yarn Classic | `tests/package_manager_test.sh`, a CI matrix |
+| npm, pnpm, Yarn Classic | `tests/package_manager_test.sh`, a CI matrix on Linux |
 | Node floor | `engines` in `package.json`, and CI runs Node 22 |
 | Shell quality | `shellcheck --severity=info`, pinned to 0.11.0 in CI |
 | `npx skills add …` | the skills CLI's published contract — read, not run |
-| Yarn PnP | `tests/package_manager_test.sh yarn-pnp`, in the CI matrix |
-| Windows, through Git Bash | `tests/package_manager_test.sh` on `windows-latest`, plus an assertion that the hooks arrive with LF endings |
+| Yarn PnP | `tests/package_manager_test.sh yarn-pnp`, in the CI matrix on Linux |
+| Windows + npm, through Git Bash | `tests/package_manager_test.sh npm` on `windows-latest`, plus an assertion that the hooks arrive with LF endings |
+| Windows + pnpm / Yarn / PnP | nothing: the Windows job runs npm only |
 | Windows, `install_test.sh` | nothing: excluded because it uses `ln -s` |
