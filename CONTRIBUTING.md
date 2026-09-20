@@ -58,6 +58,26 @@ shellcheck --severity=info install.sh tests/*.sh templates/githooks/*
 reports at `info`, and `install.sh` runs `rm -rf` against a path its caller
 supplied.
 
+**CI pins shellcheck 0.11.0**, and your local version should match. Earlier
+it used whatever `ubuntu-latest` shipped, and the versions disagreed:
+0.11.0 no longer reports SC2016 on `sh -c '... "$1" ...'`, so a contributor
+could be clean locally and fail here with nothing to reproduce. `brew
+install shellcheck` currently gives 0.11.0.
+
+## The lockfile
+
+Regenerate it from scratch, never incrementally:
+
+```bash
+rm -rf node_modules package-lock.json && npm install
+```
+
+`npm install` on top of an existing `node_modules` silently drops the
+optional platform packages a clean resolve produces — about 360 lines that
+look like a deliberate deletion in a diff. Nothing breaks, because they are
+optional, which is exactly why it would go unnoticed. CI compares the
+committed lockfile against a clean resolve and fails if they differ.
+
 ## The duplication is deliberate
 
 Several files exist twice: once under `templates/` (what adopters receive)

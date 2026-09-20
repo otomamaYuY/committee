@@ -18,14 +18,53 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      # Pinned rather than using the runner's, because CONTRIBUTING tells
+      # contributors to run this same command locally — and that was untrue:
+      # the runner's shellcheck reported SC2016 on `sh -c '... "$1" ...'`
+      # while 0.11.0 locally does not, so a contributor could be clean and
+      # still fail here with no way to reproduce it. Same version both
+      # places, or the instruction is a lie.
+      #
+      # The checksum is the digest GitHub publishes for the release asset.
+      - name: install shellcheck
+        env:
+          VERSION: v0.11.0
+          SHA256: 8c3be12b05d5c177a04c29e3c78ce89ac86f1595681cab149b65b97c4e227198
+        run: |
+          curl -fsSLO "https://github.com/koalaman/shellcheck/releases/download/$VERSION/shellcheck-$VERSION.linux.x86_64.tar.xz"
+          echo "$SHA256  shellcheck-$VERSION.linux.x86_64.tar.xz" | sha256sum -c -
+          tar -xJf "shellcheck-$VERSION.linux.x86_64.tar.xz"
+          sudo install "shellcheck-$VERSION/shellcheck" /usr/local/bin/shellcheck
+          rm -rf "shellcheck-$VERSION" "shellcheck-$VERSION.linux.x86_64.tar.xz"
+
       # One bar for everything. install.sh runs rm -rf against a path its
       # caller supplied and lands in other people's repositories, so info —
       # the level where SC2086, the unquoted expansion, actually reports — is
-      # the right floor. The harness used to need a looser bar of its own
-      # because of `sh -c '... "$1" ...'` idioms; those are now behind shared
-      # helpers, so the split has nothing left to justify it.
+      # the right floor.
       - name: shellcheck
-        run: shellcheck --severity=info install.sh tests/*.sh templates/githooks/*
+        run: |
+          shellcheck --version | sed -n 's/^version: /shellcheck /p'
+          shellcheck --severity=info install.sh tests/*.sh templates/githooks/*
+
+      # A plain `npm install` on top of an existing node_modules drops the
+      # optional platform packages npm resolves from scratch — 360 lines of
+      # deletion that looks deliberate in a diff. Nothing breaks (they are
+      # optional), so nobody would notice. Compare against a resolve with no
+      # node_modules and no lockfile, which is what CI always starts from.
+      # Resolved in a scratch directory: the earlier version did this in
+      # place, and deleting node_modules left every later step without the
+      # dependencies it needs. A check that breaks what follows it is worse
+      # than no check.
+      - name: the lockfile matches a clean resolve
+        run: |
+          work="$(mktemp -d)"
+          cp package.json "$work/"
+          ( cd "$work" && npm install --package-lock-only --no-audit --no-fund >/dev/null )
+          if ! diff -u package-lock.json "$work/package-lock.json"; then
+            echo "::error::package-lock.json is not what a clean resolve produces. Regenerate it with 'rm -rf node_modules package-lock.json && npm install', not by running npm install over an existing tree."
+            exit 1
+          fi
+          rm -rf "$work"
       - name: tests
         run: npm test
 
