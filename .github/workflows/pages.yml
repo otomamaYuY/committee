@@ -1,0 +1,48 @@
+name: pages
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'site/**'
+      - 'docs/images/**'
+      - '.github/workflows/pages.yml'
+  workflow_dispatch:
+
+# The landing page is the only thing here that writes anything, and these
+# two scopes are what Pages deployment needs: nothing else is granted.
+# tests/drift_test.js holds the matching allowlist entry.
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# A queued run should publish the newest main, not fight an older one. Never
+# cancel in progress: a half-finished deploy would leave the site partial.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      # The banner lives in docs/images/ for the README and is copied in
+      # here, rather than kept twice. A second copy is a second thing to
+      # update, which is the failure this repo exists to prevent.
+      - name: Assemble the site
+        run: cp docs/images/committee.gif site/committee.gif
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+      - id: deployment
+        uses: actions/deploy-pages@v4

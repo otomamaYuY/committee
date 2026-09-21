@@ -58,6 +58,7 @@ scopes:
   - install       # install.sh
   - tests         # tests/
   - docs          # README.md, docs/, CONTRIBUTING.md, SECURITY.md
+  - site          # site/ — the GitHub Pages landing page
   - ci            # .github/workflows/
   - deps          # dependencies (Dependabot writes this one)
   - deps-dev      # devDependencies (Dependabot writes this one)

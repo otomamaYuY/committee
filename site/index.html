@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>committee — one set of git conventions, for people and agents alike</title>
+<meta name="description" content="A small kit that keeps a repository's commits, branches and versions consistent when most of them are written by coding agents.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><text y='13' font-size='14'>&#9679;</text></svg>">
+<style>
+  :root {
+    /* Sampled from the banner so the page and the image share one surface. */
+    --bg-edge:    #2c3545;
+    --bg-centre:  #4b6577;
+    --panel:      #333e50;
+    --panel-line: #4a5a6b;
+    --ink:        #eef3f7;
+    --ink-dim:    #b3c1cf;
+    --mint:       #a9e8d6;
+    --sky:        #7fd0f7;
+    --warn:       #f0a9a0;
+  }
+  * { box-sizing: border-box; }
+
+  html { scroll-behavior: smooth; }
+  @media (prefers-reduced-motion: reduce) {
+    html { scroll-behavior: auto; }
+  }
+
+  body {
+    margin: 0;
+    padding: 0;
+    background: var(--bg-edge);
+    background-image: radial-gradient(60% 50% at 50% 38%, var(--bg-centre) 0%, var(--bg-edge) 72%);
+    background-attachment: fixed;
+    color: var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue",
+                 "Hiragino Sans", "Noto Sans JP", sans-serif;
+    font-size: 17px;
+    line-height: 1.75;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap { max-width: 880px; margin: 0 auto; padding: 0 24px; }
+
+  a { color: var(--sky); }
+  a:focus-visible, .btn:focus-visible {
+    outline: 3px solid var(--mint);
+    outline-offset: 3px;
+  }
+
+  /* ---------- hero ---------- */
+
+  header { padding: 56px 0 8px; text-align: center; }
+
+  header img {
+    width: 100%;
+    max-width: 700px;
+    height: auto;
+    display: block;
+    margin: 0 auto;
+  }
+
+  .tagline {
+    font-size: 1.3rem;
+    line-height: 1.6;
+    color: var(--ink);
+    margin: 8px auto 4px;
+    max-width: 30ch;
+  }
+
+  .sub {
+    color: var(--ink-dim);
+    max-width: 52ch;
+    margin: 0 auto 32px;
+  }
+
+  .btns {
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+    flex-wrap: wrap;
+    margin-bottom: 8px;
+  }
+
+  .btn {
+    display: inline-block;
+    padding: 11px 22px;
+    border-radius: 8px;
+    text-decoration: none;
+    font-weight: 600;
+    border: 1px solid transparent;
+  }
+  .btn-primary { background: var(--mint); color: #1d2733; }
+  .btn-primary:hover { background: #c2f2e4; }
+  .btn-ghost { border-color: #5d6e80; color: var(--ink); }
+  .btn-ghost:hover { border-color: var(--mint); color: var(--mint); }
+
+  /* ---------- sections ---------- */
+
+  section { padding: 44px 0; }
+
+  h2 {
+    font-size: 1.55rem;
+    line-height: 1.4;
+    margin: 0 0 6px;
+  }
+
+  h2 + .lede {
+    color: var(--ink-dim);
+    margin: 0 0 26px;
+    max-width: 60ch;
+  }
+
+  h3 { font-size: 1.05rem; margin: 0 0 10px; }
+
+  /* ---------- before / after ---------- */
+
+  .pair {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 18px;
+  }
+  @media (max-width: 680px) {
+    .pair { grid-template-columns: 1fr; }
+  }
+
+  .card {
+    background: var(--panel);
+    border: 1px solid #4a5a6b;
+    border-radius: 10px;
+    padding: 20px;
+  }
+
+  .card h3 .tag {
+    font-size: .75rem;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+    padding: 2px 8px;
+    border-radius: 999px;
+    margin-right: 8px;
+    vertical-align: 2px;
+  }
+  .tag-before { background: #5a3c3c; color: var(--warn); }
+  .tag-after  { background: #2f5348; color: var(--mint); }
+
+  pre, code {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  }
+
+  .card pre {
+    margin: 0;
+    font-size: .86rem;
+    line-height: 1.85;
+    overflow-x: auto;
+    color: var(--ink-dim);
+  }
+  .card pre b { color: var(--mint); font-weight: 600; }
+  .card pre i { color: var(--sky); font-style: normal; }
+
+  .card p {
+    font-size: .93rem;
+    color: var(--ink-dim);
+    margin: 16px 0 0;
+  }
+  .card p strong { color: var(--ink); }
+
+  /* ---------- layers ---------- */
+
+  .layers { display: grid; gap: 16px; }
+
+  .layer {
+    display: grid;
+    grid-template-columns: 52px 1fr;
+    gap: 18px;
+    align-items: start;
+    background: var(--panel);
+    border: 1px solid #4a5a6b;
+    border-left: 3px solid var(--mint);
+    border-radius: 10px;
+    padding: 20px;
+  }
+  .layer:nth-child(2) { border-left-color: var(--sky); }
+  @media (max-width: 680px) {
+    .layer { grid-template-columns: 1fr; gap: 6px; }
+  }
+
+  .layer .num {
+    font-size: 1.6rem;
+    font-weight: 700;
+    color: var(--mint);
+    line-height: 1.2;
+  }
+  .layer:nth-child(2) .num { color: var(--sky); }
+
+  .layer p { margin: 0; color: var(--ink-dim); font-size: .95rem; }
+  .layer p + p { margin-top: 10px; }
+
+  .why {
+    margin-top: 20px;
+    padding: 16px 20px;
+    border-radius: 10px;
+    background: #2a3341;
+    border: 1px dashed #55677a;
+    color: var(--ink-dim);
+    font-size: .95rem;
+  }
+  .why strong { color: var(--ink); }
+
+  /* ---------- single source ---------- */
+
+  .source pre {
+    background: var(--panel);
+    border: 1px solid #4a5a6b;
+    border-radius: 10px;
+    padding: 20px;
+    overflow-x: auto;
+    font-size: .86rem;
+    line-height: 1.8;
+    color: var(--ink-dim);
+    margin: 0;
+  }
+  .source pre b { color: var(--mint); font-weight: 600; }
+
+  /* ---------- install ---------- */
+
+  .install pre {
+    background: #232c38;
+    border: 1px solid #4a5a6b;
+    border-radius: 10px;
+    padding: 18px 20px;
+    overflow-x: auto;
+    font-size: .88rem;
+    line-height: 1.9;
+    color: var(--mint);
+    margin: 0 0 12px;
+  }
+  .install pre span { color: #8898a8; }
+  .install .note { font-size: .92rem; color: var(--ink-dim); margin: 0 0 28px; }
+
+  ol.steps { padding-left: 0; list-style: none; counter-reset: s; margin: 0; }
+  ol.steps > li { counter-increment: s; margin-bottom: 26px; }
+  ol.steps > li > h3::before {
+    content: counter(s);
+    display: inline-grid;
+    place-items: center;
+    width: 24px; height: 24px;
+    margin-right: 10px;
+    border-radius: 50%;
+    background: var(--mint);
+    color: #1d2733;
+    font-size: .82rem;
+    font-weight: 700;
+  }
+
+  /* ---------- footer ---------- */
+
+  footer {
+    border-top: 1px solid #44536380;
+    padding: 30px 0 60px;
+    color: var(--ink-dim);
+    font-size: .9rem;
+    text-align: center;
+  }
+  footer p { margin: 6px 0; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wrap">
+    <img src="committee.gif"
+         alt="The word committee, its letters drifting out of alignment and settling back into a single line"
+         width="880" height="320">
+    <p class="tagline">One set of git conventions, for people and agents alike.</p>
+    <p class="sub">
+      When most of your commits are written by Claude Code or Codex, the
+      history stops being readable. committee is a small kit that fixes that
+      — and keeps it fixed.
+    </p>
+    <div class="btns">
+      <a class="btn btn-primary" href="#install">Install it</a>
+      <a class="btn btn-ghost" href="https://github.com/otomamaYuY/committee">View on GitHub</a>
+    </div>
+  </div>
+</header>
+
+<main>
+
+<section class="wrap">
+  <h2>What it actually changes</h2>
+  <p class="lede">
+    Every change to a codebase is saved with a one-line note saying what it
+    was. Those notes are how anyone later works out when something broke,
+    what shipped in a release, and whether a version is safe to upgrade to.
+  </p>
+
+  <div class="pair">
+    <div class="card">
+      <h3><span class="tag tag-before">Before</span>A week of history</h3>
+<pre>update
+fix
+WIP
+more changes
+fix again
+final</pre>
+      <p>
+        Six notes, no information. Nobody can tell which of these fixed the
+        login bug, and <strong>a release note can only be written by reading
+        every change by hand.</strong>
+      </p>
+    </div>
+
+    <div class="card">
+      <h3><span class="tag tag-after">After</span>The same week</h3>
+<pre><b>feat</b>(<i>auth</i>): add password reset
+<b>fix</b>(<i>api</i>): reject empty queries
+<b>docs</b>: explain the retry policy
+<b>test</b>(<i>auth</i>): cover expired tokens
+<b>fix</b>(<i>ui</i>): keep focus after submit
+<b>refactor</b>: split the parser</pre>
+      <p>
+        The first word says what kind of change it was, the bracket says
+        where. <strong>Release notes, and the next version number, can now be
+        worked out mechanically</strong> — nobody has to read the code to
+        find out what happened.
+      </p>
+    </div>
+  </div>
+</section>
+
+<section class="wrap">
+  <h2>Why it takes two layers</h2>
+  <p class="lede">
+    You could just write the rules down, or just add an automatic checker.
+    Each one alone leaves a hole the other covers.
+  </p>
+
+  <div class="layers">
+    <div class="layer">
+      <div class="num">1</div>
+      <div>
+        <h3>Teach the rules</h3>
+        <p>
+          A Claude Code Skill and an <code>AGENTS.md</code> explain the
+          conventions to the agent — including <em>why</em> a given change is
+          a fix rather than a feature. That judgment is the part no automatic
+          checker can make.
+        </p>
+      </div>
+    </div>
+
+    <div class="layer">
+      <div class="num">2</div>
+      <div>
+        <h3>Enforce the rules</h3>
+        <p>
+          Git hooks and a CI workflow reject a malformed commit or branch
+          before it lands — whoever wrote it, person or agent. This part does
+          not rely on anyone remembering, or complying.
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <p class="why">
+    <strong>Neither half is decoration.</strong> Written rules alone get
+    followed <em>most</em> of the time, and "most" is not something you can
+    put in a changelog. A checker alone only sees shape: label a bug fix as a
+    new feature and it passes every rule, while quietly telling everyone
+    downstream the wrong thing about what changed.
+  </p>
+</section>
+
+<section class="wrap source">
+  <h2>One file decides everything</h2>
+  <p class="lede">
+    The allowed commit types, branch prefixes and review labels live in a
+    single file. Nothing else restates them, so there is no second list to
+    keep in sync and no way for your machine and the pipeline to disagree.
+  </p>
+<pre><b>.claude/git-conventions.yaml</b>
+        │
+        ├──► the Skill           what Claude Code is told
+        ├──► AGENTS.md           what Codex and others are told
+        ├──► commitlint.config.js   the commit message check
+        └──► .githooks/pre-push     the branch name check</pre>
+</section>
+
+<section class="wrap install" id="install">
+  <h2>Install</h2>
+  <p class="lede">
+    The target has to exist already and be a git repository.
+  </p>
+
+  <ol class="steps">
+    <li>
+      <h3>Run the installer</h3>
+<pre>git clone https://github.com/otomamaYuY/committee.git /tmp/committee
+/tmp/committee/install.sh /path/to/your/repo</pre>
+      <p class="note">
+        Existing files are never overwritten — anything already there is
+        listed as skipped. A repo that already routes its hooks elsewhere is
+        detected rather than hijacked.
+      </p>
+    </li>
+
+    <li>
+      <h3>Install the dependencies</h3>
+<pre>cd /path/to/your/repo
+npm install   <span># or pnpm install / yarn install</span></pre>
+      <p class="note">
+        This is what activates the hooks. Node 22.12 or newer.
+      </p>
+    </li>
+
+    <li>
+      <h3>Check the one script your teammates need</h3>
+      <p class="note">
+        The hooks are switched on by a <code>prepare</code> script in
+        <code>package.json</code>. If your repo already had one, the
+        installer tells you to add that line yourself — skip it and the hooks
+        run for exactly one person on the team, silently.
+      </p>
+    </li>
+  </ol>
+
+  <div class="btns" style="justify-content:flex-start">
+    <a class="btn btn-primary" href="https://github.com/otomamaYuY/committee#install">Full instructions</a>
+    <a class="btn btn-ghost" href="https://github.com/otomamaYuY/committee/blob/main/docs/design.md">Why it is shaped this way</a>
+  </div>
+</section>
+
+</main>
+
+<footer>
+  <div class="wrap">
+    <p>
+      committee implements
+      <a href="https://www.conventionalcommits.org">Conventional Commits</a>,
+      <a href="https://conventionalbranch.org">Conventional Branch</a>,
+      <a href="https://semver.org">Semantic Versioning</a> and
+      <a href="https://conventionalcomments.org">Conventional Comments</a>.
+    </p>
+    <p>
+      MIT licensed ·
+      <a href="https://github.com/otomamaYuY/committee">github.com/otomamaYuY/committee</a>
+    </p>
+  </div>
+</footer>
+
+</body>
+</html>
