@@ -106,6 +106,35 @@ install_file() {
   return 0
 }
 
+# True when the file has exactly one committee:start and one committee:end, in
+# that order. Anything else - none, several, or an end before a start - is a
+# file the installer must not try to splice, because it cannot tell which
+# region the kit owns.
+has_one_marked_region() {
+  awk '
+    /^<!-- committee:start/ { starts++; if (ends == 0) order = 1 }
+    /^<!-- committee:end/   { ends++;   if (starts == 0) order = 0 }
+    END { exit !(starts == 1 && ends == 1 && order == 1) }
+  ' "$1"
+}
+
+# Print $2 with its marked region replaced by the marked region of $1.
+# Everything outside the markers in $2 is passed through untouched.
+replace_marked_region() {
+  awk -v src="$1" '
+    BEGIN {
+      while ((getline line < src) > 0) {
+        if (line ~ /^<!-- committee:start/) inside = 1
+        if (inside) block = block line "\n"
+        if (line ~ /^<!-- committee:end/) inside = 0
+      }
+    }
+    /^<!-- committee:start/ { printf "%s", block; skip = 1; next }
+    /^<!-- committee:end/   { if (skip) { skip = 0; next } }
+    !skip { print }
+  ' "$2"
+}
+
 # --- Skill (kit-owned, always refreshed) ------------------------------------
 # This is the knowledge layer shipped by the kit, not a user customization
 # surface, so re-running the installer to pick up an updated Skill replaces it.
@@ -151,11 +180,41 @@ install_file "$SRC_DIR/templates/git-conventions.yaml" "$TARGET_DIR/.claude/git-
 install_file "$SRC_DIR/templates/commitlint.config.js" "$TARGET_DIR/commitlint.config.js" || true
 
 # The knowledge layer for agents that read AGENTS.md (Codex and others).
-# Claude Code gets the same content as a Skill, above. Plenty of repos
-# already have an AGENTS.md, so a skipped one is called out at the end
-# rather than left to be discovered later.
-if ! install_file "$SRC_DIR/templates/AGENTS.md" "$TARGET_DIR/AGENTS.md"; then
+# Claude Code gets the same content as a Skill, above, and the Skill is
+# replaced on every install. AGENTS.md cannot be, because in most repos it is
+# the adopter's own file — but leaving it alone entirely meant a repo that
+# installed once never received a correction to the conventions again, and
+# nothing said so. Its Codex-side reviewers just went quietly stale against
+# its Claude-side ones.
+#
+# So the kit owns a marked region inside the file and nothing else. The
+# region is refreshed; everything around it is the adopter's and is left
+# exactly as it was. A file with no markers is still never touched.
+_agents_dest="$TARGET_DIR/AGENTS.md"
+if [ ! -e "$_agents_dest" ] || [ "$FORCE" = "yes" ]; then
+  install_file "$SRC_DIR/templates/AGENTS.md" "$_agents_dest" || true
+elif ! has_one_marked_region "$_agents_dest"; then
+  # An AGENTS.md that predates the markers, or one the adopter wrote
+  # themselves. Both are theirs; say so rather than editing it.
+  SKIPPED+=("  AGENTS.md")
   MISSING_AGENTS="yes"
+else
+  _agents_tmp="$(mktemp)"
+  replace_marked_region "$SRC_DIR/templates/AGENTS.md" "$_agents_dest" > "$_agents_tmp"
+  if diff -q "$_agents_tmp" "$_agents_dest" >/dev/null 2>&1; then
+    WRITTEN+=("  AGENTS.md (conventions section already current)")
+  else
+    # The adopter may have edited inside the region. Replacing is the point,
+    # but it should not be the kind of replacing that loses work silently.
+    cp "$_agents_dest" "$_agents_dest.bak"
+    if ! cp "$_agents_tmp" "$_agents_dest"; then
+      echo "Error: failed to update $_agents_dest" >&2
+      rm -f "$_agents_tmp"
+      exit 1
+    fi
+    WRITTEN+=("  AGENTS.md (conventions section refreshed - your previous file was kept as AGENTS.md.bak)")
+  fi
+  rm -f "$_agents_tmp"
 fi
 
 # --- Git hooks --------------------------------------------------------------
@@ -227,10 +286,15 @@ fi
 if [ "$MISSING_AGENTS" = "yes" ]; then
   cat << 'WARN'
 
-Warning: this repo already has an AGENTS.md, so the conventions section was
-  NOT added. Agents that read AGENTS.md (Codex and others) will not be told
-  about the conventions, and will hit the hooks instead of following them.
-  Copy templates/AGENTS.md from the kit into a section of your own file.
+Warning: this repo has an AGENTS.md with no committee markers in it, so the
+  conventions section was NOT added. Agents that read AGENTS.md (Codex and
+  others) will not be told about the conventions, and will hit the hooks
+  instead of following them.
+
+  Paste templates/AGENTS.md into your file, markers included. Keeping the
+  markers is what lets a later install refresh that section for you; without
+  them this warning is all the kit can ever do, and your copy will drift as
+  the conventions change.
 WARN
 fi
 

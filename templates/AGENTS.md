@@ -1,3 +1,6 @@
+<!-- committee:start - everything between these markers belongs to the
+committee kit and is replaced when you re-run its installer. Keep your own
+notes outside them, and they will survive. -->
 # Git conventions
 
 Applies to every branch, commit message and review comment in this repo —
@@ -92,3 +95,5 @@ Read what it printed and fix the cause. Do **not** pass `--no-verify`, and
 do not edit or disable the hooks to get a commit through. If a type you
 genuinely need is missing, add it to `.claude/git-conventions.yaml` — every
 layer reads that file, so one edit changes what is allowed everywhere.
+
+<!-- committee:end -->

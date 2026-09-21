@@ -30,8 +30,9 @@ inside the one it lands on by hand.
 `npm test` runs two suites, neither of which needs a test framework:
 
 - `tests/install_test.sh` — contract tests for `install.sh`: argument
-  validation happens before anything is written, existing files in the target
-  repo are never overwritten without `--force`, `core.hooksPath` is wired up
+  validation happens before anything is written, the adopter's files are
+  never overwritten without `--force` while the two regions the kit owns are
+  refreshed, `core.hooksPath` is wired up
   without hijacking a repo that already routes hooks elsewhere, and — end to
   end, with real `git commit` calls — the type and scope lists in
   `git-conventions.yaml` are what the installed hook actually enforces.

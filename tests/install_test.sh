@@ -137,14 +137,71 @@ has "the warning names what the hook needs"       "$OUT" "@commitlint/cli"
 "$INSTALL" "$REPO" --force >/dev/null 2>&1
 ok "--force overwrites an existing file" grep -q 'git-conventions' "$REPO/commitlint.config.js"
 
+# grep -v is per-line, so it cannot express "this file contains no such line".
+not_grep() { ! grep -qx "$1" "$2"; }
+
+# The report lists AGENTS.md under Written or under Skipped, never both. The
+# refresh path must not also claim it was left untouched.
+test_no_skipped_agents() {
+  ! printf '%s' "$1" | awk '/^Skipped/ { s = 1; next } /^$/ { s = 0 } s && /AGENTS\.md/ { found = 1 } END { exit !found }'
+}
+
 echo "== an existing AGENTS.md is preserved and called out"
 
 AG="$(new_repo agents)"
 printf '# my own agent notes\n' > "$AG/AGENTS.md"
 AG_OUT="$("$INSTALL" "$AG" 2>&1)"
 ok "a pre-existing AGENTS.md survives" grep -qx '# my own agent notes' "$AG/AGENTS.md"
-has "the skipped AGENTS.md is warned about" "$AG_OUT" "already has an AGENTS.md"
-has "the warning says what to do"           "$AG_OUT" "templates/AGENTS.md"
+has "the unmarked AGENTS.md is warned about" "$AG_OUT" "no committee markers"
+has "the warning says what to do"            "$AG_OUT" "templates/AGENTS.md"
+has "the warning explains why markers matter" "$AG_OUT" "refresh that section"
+
+echo "== a marked AGENTS.md has its section refreshed, and only that section"
+
+# The whole point of the markers: a repo that installed once must keep
+# receiving corrections to the conventions, without the installer touching a
+# line the adopter wrote. A stale conventions section is how a repo's Codex
+# reviewers end up disagreeing with its Claude ones.
+MK="$(new_repo marked)"
+{
+  printf '# House notes\n\nSomething of my own, above.\n\n'
+  cat "$KIT_DIR/templates/AGENTS.md"
+  printf '\n## My own section\n\nSomething of my own, below.\n'
+} > "$MK/AGENTS.md"
+# Make the kit's region stale, the way an older install would be.
+sed -i.orig 's/^# Git conventions$/# Git conventions (stale)/' "$MK/AGENTS.md" && rm -f "$MK/AGENTS.md.orig"
+MK_OUT="$("$INSTALL" "$MK" 2>&1)"
+
+ok "text above the markers survives"  grep -qx 'Something of my own, above.' "$MK/AGENTS.md"
+ok "text below the markers survives"  grep -qx 'Something of my own, below.' "$MK/AGENTS.md"
+ok "the stale section is replaced"    not_grep '# Git conventions (stale)' "$MK/AGENTS.md"
+ok "the current section is installed" grep -q 'Blocking is carried by the decoration' "$MK/AGENTS.md"
+ok "the previous file is kept"        test -f "$MK/AGENTS.md.bak"
+ok "the backup has the stale section" grep -qx '# Git conventions (stale)' "$MK/AGENTS.md.bak"
+has "the refresh is reported"         "$MK_OUT" "conventions section refreshed"
+ok "the file is not listed as skipped" test_no_skipped_agents "$MK_OUT"
+
+echo "== a marked AGENTS.md that is already current is left alone"
+
+CUR="$(new_repo current)"
+cp "$KIT_DIR/templates/AGENTS.md" "$CUR/AGENTS.md"
+CUR_OUT="$("$INSTALL" "$CUR" 2>&1)"
+has "an already-current section says so" "$CUR_OUT" "already current"
+ok "no needless backup is left"          test ! -f "$CUR/AGENTS.md.bak"
+
+echo "== an AGENTS.md with confused markers is not spliced"
+
+# Two starts, or an end before a start, means the installer cannot tell which
+# region is the kit's. Guessing would edit the adopter's prose.
+BAD="$(new_repo badmarkers)"
+{
+  printf '<!-- committee:end -->\n'
+  printf '# mine\n'
+  printf '<!-- committee:start -->\n'
+} > "$BAD/AGENTS.md"
+BAD_OUT="$("$INSTALL" "$BAD" 2>&1)"
+ok "a confusingly marked file is untouched" grep -qx '# mine' "$BAD/AGENTS.md"
+has "and is warned about like any other"    "$BAD_OUT" "no committee markers"
 
 echo "== a repo that already routes hooks elsewhere is not hijacked"
 
