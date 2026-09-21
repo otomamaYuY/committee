@@ -1,2 +1,6 @@
 node_modules/
 *.bak
+
+# Copied in by the pages workflow at deploy time; kept out of the tree so
+# a local preview copy cannot be committed as a second source.
+site/committee.gif
