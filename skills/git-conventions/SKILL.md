@@ -34,7 +34,47 @@ a fixed list.
   `<label> [decorations]: <subject>`.
   **No linter checks this one — this skill is the only safeguard.** Pick the
   type/label that actually matches the change, not just one that happens to
-  be on the allowed list.
+  be on the allowed list. What blocks a merge is covered below.
+
+## Leaving a review
+
+**Blocking is carried by the decoration, never by the label.** A comment does
+not stop a pull request being approved unless it carries `(blocking)`. If you
+mean one to stop it, say so — no label does it for you. The decorations are
+`(blocking)`, `(non-blocking)` and `(if-minor)`. Under this default
+`(non-blocking)` is redundant and exists to be explicit when you want to be;
+`(if-minor)` never blocks and leaves resolution to the author when the change
+turns out to be trivial.
+
+None of this depends on which label a comment carries — including a label the
+conventions file does not list. Such a comment is malformed and should be
+relabelled, but until it is, its decoration alone still decides whether it
+blocks. Nothing is more blocking for sounding more serious.
+
+Where the specification's own description of a label makes its comments a
+prerequisite for acceptance — `chore:` is defined that way, for example —
+decorate them `(blocking)` yourself. Which labels those are is answered by the
+spec's own label descriptions, linked above, and deliberately not repeated
+here. The default does not do it for you. That
+is a deliberate departure from the spec, not a reading of it: stating it per
+label would mean writing a second list of labels outside
+`.claude/git-conventions.yaml`, which is the one thing this kit does not do.
+
+**A comment is resolved when the person who left it says so** — they mark the
+thread resolved, or reply agreeing it is addressed. A reply from the author,
+or a new commit, does not resolve someone else's comment, and an author
+clearing a `(blocking)` comment against themselves does not count, even where
+the platform allows the click.
+
+**Approve when no unresolved comment carries `(blocking)`.** Withholding
+approval for any other reason is still yours to do. This says when a *comment*
+stops a merge, not when *you* do.
+
+**Leave praise where there is something to praise, and look for it before
+concluding there is not.** Never write praise you do not mean: the spec warns
+that false praise does damage, so an insincere one is worse than none. This is
+guidance rather than a condition of approval — as a condition it would leave
+manufacturing praise as the only way past a change with nothing to admire.
 
 ## When a hook rejects you
 
