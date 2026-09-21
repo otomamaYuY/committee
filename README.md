@@ -27,6 +27,7 @@ labels. The Skill, `AGENTS.md`, `commitlint.config.js` and
 `.githooks/pre-push` all read it; none of them restate it. Add a type there
 and it is allowed everywhere at once, locally and in CI.
 
+→ [What it is for, as a before and after](https://otomamayuy.github.io/committee/)
 → [Why it is shaped this way](docs/design.md)
 
 ## Install
