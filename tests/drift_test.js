@@ -212,6 +212,13 @@ console.log('== workflows are pinned and scoped');
 
 const WORKFLOW_DIRS = ['.github/workflows', 'templates/github-workflows'];
 
+// Read-only is the rule. A workflow that genuinely has to write names the
+// exact scopes here, so granting a new one is a reviewable edit to this
+// file rather than a quiet line in a YAML nobody re-reads.
+const WRITE_ALLOWED = {
+  '.github/workflows/pages.yml': ['pages: write', 'id-token: write'],
+};
+
 for (const dir of WORKFLOW_DIRS) {
   for (const name of fs.readdirSync(path.join(ROOT, dir)).sort()) {
     const rel = path.join(dir, name);
@@ -243,6 +250,7 @@ for (const dir of WORKFLOW_DIRS) {
       no(`${rel} declares permissions`,
          'without it the job inherits the repository default, which may be read-write');
     } else {
+      const allowed = WRITE_ALLOWED[rel] || [];
       const offenders = [];
       for (const scopes of scopeSets) {
         if (typeof scopes === 'string') {
@@ -250,11 +258,13 @@ for (const dir of WORKFLOW_DIRS) {
           continue;
         }
         for (const [scope, level] of Object.entries(scopes)) {
-          if (level !== 'read' && level !== 'none') offenders.push(`${scope}: ${level}`);
+          const granted = `${scope}: ${level}`;
+          if (level === 'read' || level === 'none') continue;
+          if (!allowed.includes(granted)) offenders.push(granted);
         }
       }
-      if (offenders.length === 0) ok(`${rel} grants only read scopes`);
-      else no(`${rel} grants only read scopes`,
+      if (offenders.length === 0) ok(`${rel} grants only permitted scopes`);
+      else no(`${rel} grants only permitted scopes`,
               `found ${offenders.join(', ')} — if a write scope is genuinely needed, ` +
               'add it to this allowlist deliberately rather than loosening the check');
     }
