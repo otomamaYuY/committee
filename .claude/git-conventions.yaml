@@ -57,6 +57,7 @@ scopes:
   - agents        # AGENTS.md
   - install       # install.sh
   - tests         # tests/
+  - evals         # evals/ - measuring the knowledge layer
   - docs          # README.md, docs/, CONTRIBUTING.md, SECURITY.md
   - site          # site/ — the GitHub Pages landing page
   - ci            # .github/workflows/

@@ -36,6 +36,12 @@ inside the one it lands on by hand.
   without hijacking a repo that already routes hooks elsewhere, and — end to
   end, with real `git commit` calls — the type and scope lists in
   `git-conventions.yaml` are what the installed hook actually enforces.
+- `tests/eval_harness_test.js` — the knowledge-layer eval cannot run in CI
+  (it needs an agent and is not deterministic), so this drives it with stub
+  responders and checks the grader reaches the right verdict. A grader that
+  silently passed everything would look exactly like a knowledge layer that
+  works. See [evals/README.md](evals/README.md) for the eval itself and how to
+  run it with `npm run eval`.
 - `tests/drift_test.js` — catches what rots without raising an error: the
   root files this repo dogfoods against their `templates/` counterparts, the
   claim that `.claude/git-conventions.yaml` is the single source of truth

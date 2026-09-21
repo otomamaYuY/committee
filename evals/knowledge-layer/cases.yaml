@@ -1,0 +1,90 @@
+# What the knowledge layer has to be able to answer.
+#
+# Every case here has one defensible answer that follows from the shipped
+# rules alone. `expect` is graded mechanically against the first line of the
+# reply, so a case belongs here only if its answer is genuinely unambiguous —
+# a question whose answer is "it depends" measures the grader, not the kit.
+#
+# `unanswerable` cases are the control. A model that answers everything
+# confidently will fail them, and without at least one of them a run that
+# scores 100% tells you nothing about whether the rules were read or merely
+# guessed at from what the model already knows about Conventional Comments.
+
+cases:
+  - id: undecorated-suggestion
+    expect: "no"
+    tests: blocking is carried by the decoration, not the label
+    question: >
+      A reviewer left this comment on a pull request and it is unresolved:
+      `suggestion: extract this into a helper`.
+      Does that comment prevent the pull request from being approved?
+
+  - id: decorated-suggestion
+    expect: "yes"
+    tests: the decoration is what blocks
+    question: >
+      A reviewer left this comment on a pull request and it is unresolved:
+      `suggestion (blocking): extract this into a helper`.
+      Does that comment prevent the pull request from being approved?
+
+  - id: undecorated-issue
+    expect: "no"
+    tests: >
+      a severe-sounding label still does not block on its own — the case most
+      likely to be answered from prior knowledge rather than from the file
+    question: >
+      A reviewer left this comment on a pull request and it is unresolved:
+      `issue: this drops the error path`.
+      Does that comment prevent the pull request from being approved?
+
+  - id: unknown-label
+    expect: "no"
+    tests: the rule does not depend on the label being one the kit ships
+    question: >
+      A reviewer left this comment on a pull request and it is unresolved:
+      `security: this endpoint has no auth check`.
+      Does that comment prevent the pull request from being approved?
+
+  - id: author-resolves
+    expect: "no"
+    tests: resolution belongs to whoever left the comment
+    question: >
+      A reviewer left `issue (blocking): this drops the error path`. The
+      author of the pull request then clicked the platform's "Resolve
+      conversation" button on it, and nobody else replied.
+      Is that comment resolved for the purpose of approving the pull request?
+
+  - id: no-praise-available
+    expect: "yes"
+    tests: praise is guidance, not a condition of approval
+    question: >
+      You reviewed a change, left no blocking comments, and honestly found
+      nothing about it worth praising, so you wrote no praise comment.
+      Are you allowed to approve the pull request?
+
+  - id: undecorated-chore
+    expect: "no"
+    tests: >
+      the default applies even where the specification calls the label a
+      prerequisite; the rules tell the reviewer to decorate it, and an
+      undecorated one still does not block
+    question: >
+      A reviewer left this comment on a pull request and it is unresolved:
+      `chore: add the changelog entry`. It carries no decoration.
+      Does that comment, as written, prevent the pull request from being
+      approved?
+
+  # --- controls: the files genuinely do not answer these ---------------------
+
+  - id: control-language
+    expect: "unanswerable"
+    tests: the model declines rather than inventing a rule
+    question: >
+      Do these conventions require review comments to be written in English?
+
+  - id: control-review-count
+    expect: "unanswerable"
+    tests: the model declines rather than inventing a rule
+    question: >
+      Do these conventions say how many reviewers must approve a pull request
+      before it can be merged?
