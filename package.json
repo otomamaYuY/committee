@@ -10,7 +10,8 @@
   },
   "scripts": {
     "prepare": "node -e \"try{require('child_process').execSync('git config --local core.hooksPath .githooks',{stdio:'ignore'})}catch{console.warn('[committee] not a git repository - hooks not wired')}\"",
-    "test": "bash tests/install_test.sh && node tests/drift_test.js"
+    "test": "bash tests/install_test.sh && node tests/drift_test.js && node tests/eval_harness_test.js",
+    "eval": "node evals/knowledge-layer/run.js"
   },
   "devDependencies": {
     "@commitlint/cli": "^21.2.3",
