@@ -52,10 +52,17 @@ already had a `package.json`, the installer tells you to add that script
 yourself — skip it and the hooks run for exactly one person on the team,
 silently.
 
-**Existing files are never overwritten.** Anything already there is left
-alone and listed under `Skipped`, with a warning where it matters. Pass
-`--force` to overwrite instead. A repo that already routes hooks elsewhere
-(husky, say) is detected rather than hijacked.
+**Your files are never overwritten.** Anything already there is left alone
+and listed under `Skipped`, with a warning where it matters. Pass `--force`
+to overwrite instead. A repo that already routes hooks elsewhere (husky, say)
+is detected rather than hijacked.
+
+**Two things the kit owns are refreshed**, because that is how you pick up a
+correction to the conventions: the Skill directory, and the region of your
+`AGENTS.md` between the `committee:start` and `committee:end` markers.
+Everything outside those markers is yours and is left exactly as it was, and
+an `AGENTS.md` with no markers is not touched at all. If either had been
+edited, the previous copy is kept beside it as `.bak`.
 
 ### Just the Skill
 
